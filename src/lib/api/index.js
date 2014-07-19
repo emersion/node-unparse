@@ -37,6 +37,16 @@ app.get('/1/classes/:className', function(req, res) { // Query objects
 		res.send(400, err);
 	});
 });
+app.get('/1/classes/:className/:objectId', function(req, res) { // Get object
+	var className = req.param('className'),
+		objectId = req.param('objectId');
+
+	db.retrieveObject(className, objectId).then(function (object) {
+		res.send(object.toObject());
+	}, function (err) {
+		res.send(400, err);
+	});
+});
 app.post('/1/classes/:className', function(req, res, next) { // Create object
 	var className = req.param('className'),
 		objectData = req.body;
@@ -49,16 +59,6 @@ app.post('/1/classes/:className', function(req, res, next) { // Create object
 			createdAt: object.createdAt,
 			objectId: object._id
 		});
-	}, function (err) {
-		res.send(400, err);
-	});
-});
-app.get('/1/classes/:className/:objectId', function(req, res) { // Get object
-	var className = req.param('className'),
-		objectId = req.param('objectId');
-
-	db.retrieveObject(className, objectId).then(function (object) {
-		res.send(object.toObject());
 	}, function (err) {
 		res.send(400, err);
 	});
@@ -76,7 +76,7 @@ app.put('/1/classes/:className/:objectId', function(req, res) { // Update object
 		res.send(400, err);
 	});
 });
-app.delete('/1/classes/:className/:objectId', function(req, res) {
+app.delete('/1/classes/:className/:objectId', function(req, res) { // Delete object
 	var className = req.param('className'),
 		objectId = req.param('objectId');
 
