@@ -14,7 +14,7 @@ Features
 - [x] Querying objects (basic support)
 - [ ] Querying objects (query contraints)
 - [ ] Querying objects (relationnal queries)
-- [ ] API keys and authentication
+- [x] API keys and authentication
 - [ ] Access Control Lists (ACL)
 - [ ] Pointers
 - [ ] Users
