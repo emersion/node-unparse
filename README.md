@@ -31,3 +31,5 @@ Default classes properties are:
 * `createdAt`: the object's creation date
 * `updatedAt`: the object's last update date
 * `ACL`: for Access Control Lists
+
+Currently, there is only one application per server. API credentials can be modified in `src/config/`.
