@@ -3,7 +3,7 @@ unparse
 
 An open-source clone of Parse, using MongoDB as database and implemented with Node.js.
 
-See https://www.parse.com/docs/rest for the REST API documentation. Unparse should be compatible with it and 
+See https://www.parse.com/docs/rest for the REST API documentation. Unparse should be compatible with it and existing Parse SDKs (e.g. with the [Javascript SDK](https://parse.com/docs/js_guide)).
 
 Features
 --------
