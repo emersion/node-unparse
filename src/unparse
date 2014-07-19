@@ -1,0 +1,7 @@
+#!/usr/bin/env node
+
+// Allows the server to be launched from another directory
+process.chdir(__dirname);
+
+// Start the server
+require('./server');
