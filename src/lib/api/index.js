@@ -4,9 +4,23 @@ var fs = require('fs');
 var path = require('path');
 var db = require('../db');
 
+// Connect to the database
+var dbOpening = db.connect().then(function () {
+	console.log('Database opened.');
+}, function (err) {
+	console.warn('Cannot connect to database', err);
+});
+// Wait for the database before answering requests
 app.use(function(req, res, next) {
-	res.setHeader('Content-Type', 'application/json');
-	next();
+	if (dbOpening.isPending()) { // Database not ready
+		dbOpening.then(function () {
+			next();
+		}, function () { // Database connect error
+			res.send(500, 'Cannot connect to database');
+		});
+	} else {
+		next();
+	}
 });
 
 // Objects

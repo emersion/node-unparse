@@ -114,6 +114,12 @@ module.exports.loadBaseModels = function () {
 
 module.exports.loadAllModels = function (classes) {
 	for (var i = 0; i < classes.length; i++) {
-		this.loadModel(classes[i]);
+		var classData = classes[i];
+
+		try {
+			this.loadModel(classData);
+		} catch (e) {
+			console.warn('Cannot load stored class '+classData.name, e);
+		}
 	}
 };

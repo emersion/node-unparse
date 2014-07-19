@@ -1,20 +1,8 @@
 var mongoose = require('mongoose');
-var models = require('./models');
 var Q = require('q');
-
-mongoose.connect('mongodb://localhost/unparse');
-
-var db = mongoose.connection;
-db.on('error', console.error.bind(console, 'connection error:'));
-db.once('open', function () {
-	models.loadBaseModels();
-
-	models.__Class.find(function (err, classes) {
-		models.loadAllModels(classes);
-	});
-
-	console.log('Database opened');
-});
+var EventEmitter = require('events').EventEmitter;
+var models = require('./models');
+var config = require('../../config');
 
 function isClass(className) {
 	return !!models[className];
@@ -29,7 +17,30 @@ function ensureClassExists(className, deferred) {
 	return true;
 }
 
-module.exports.retrieveObject = function (className, objectId) {
+var controller = new EventEmitter();
+
+controller.connect = function () {
+	var deferred = Q.defer();
+
+	mongoose.connect(config.database.uri);
+
+	var db = mongoose.connection;
+	db.on('error', console.error.bind(console, 'connection error:'));
+	db.once('open', function () {
+		models.loadBaseModels();
+
+		models.__Class.find(function (err, classes) {
+			models.loadAllModels(classes);
+
+			controller.emit('open');
+			deferred.resolve();
+		});
+	});
+
+	return deferred.promise;
+};
+
+controller.retrieveObject = function (className, objectId) {
 	var deferred = Q.defer();
 
 	if (!ensureClassExists(className, deferred)) {
@@ -49,7 +60,7 @@ module.exports.retrieveObject = function (className, objectId) {
 	return deferred.promise;
 };
 
-module.exports.queryObjects = function (className, opts) {
+controller.queryObjects = function (className, opts) {
 	var deferred = Q.defer();
 
 	if (!ensureClassExists(className, deferred)) {
@@ -77,7 +88,7 @@ module.exports.queryObjects = function (className, opts) {
 	return deferred.promise;
 };
 
-module.exports.insertObject = function (className, objectData) {
+controller.insertObject = function (className, objectData) {
 	var deferred = Q.defer();
 
 	if (!ensureClassExists(className, deferred)) {
@@ -114,7 +125,7 @@ module.exports.insertObject = function (className, objectData) {
 	return deferred.promise;
 };
 
-module.exports.updateObject = function (className, objectId, objectData) {
+controller.updateObject = function (className, objectId, objectData) {
 	var deferred = Q.defer();
 
 	if (!ensureClassExists(className, deferred)) {
@@ -140,7 +151,7 @@ module.exports.updateObject = function (className, objectId, objectData) {
 	return deferred.promise;
 };
 
-module.exports.deleteObject = function (className, objectId) {
+controller.deleteObject = function (className, objectId) {
 	var deferred = Q.defer();
 
 	if (!ensureClassExists(className, deferred)) {
@@ -165,12 +176,12 @@ module.exports.deleteObject = function (className, objectId) {
 	return deferred.promise;
 };
 
-module.exports.init = function () {
+controller.init = function () {
 	var deferred = Q.defer();
 
 	// Default classes
 	var classes = [{
-		name: 'User',
+		name: '_User',
 		fields: [{
 			name: 'username',
 			type: 'String'
@@ -181,11 +192,32 @@ module.exports.init = function () {
 			name: 'email',
 			type: 'String'
 		}]
-	}];
+	}/*, {
+		name: '_Role',
+		fields: [{
+			name: 'name',
+			type: 'String'
+		}, {
+			name: 'roles',
+			type: '[Relation<_Role>]'
+		}, {
+			name: 'users',
+			type: '[Relation<_User>]'
+		}]
+	}*/];
 
+	var promises = [];
 	for (var i = 0; i < classes.length; i++) {
-		this.insertObject('__Class', classes[i]);
+		var classData = classes[i];
+
+		// The class will be automatically loaded when inserting it
+		var promise = this.insertObject('__Class', classData).catch(function (err) {
+			models.unloadModel(classData.name);
+		});
+		promises.push(promise);
 	}
 
-	return deferred.promise;
+	return Q.all(promises);
 };
+
+module.exports = controller;

@@ -3,5 +3,46 @@
 // Allows the server to be launched from another directory
 process.chdir(__dirname);
 
-// Start the server
-require('./server');
+// Get argv
+var argv = process.argv;
+if (argv[0] == 'node') {
+	argv = argv.slice(2);
+} else {
+	argv = argv.slice(1);
+}
+
+// Parse argv
+var opt = require('node-getopt').create([
+	['h' , 'help', 'display this help']
+])
+.setHelp('Usage: node unparse [OPTIONS]\n'+
+	'An open-source clone of Parse.\n\n'+
+	'Arguments:\n'+
+	'  server  start the server\n'+
+	'  init  populate the database with default classes\n\n'+
+	'Options:\n[[OPTIONS]]\n')
+.bindHelp()
+.parseSystem();
+
+switch (opt.argv[0]) {
+	case 'init':
+		// Init the database
+		var db = require('./lib/db');
+
+		db.connect().then(function () {
+			process.stdout.write('Populating database with default classes...\n');
+			return db.init();
+		}).then(function () {
+			process.stdout.write('Database populated with default classes.\n');
+			process.exit(0);
+		}, function (err) {
+			process.stderr.write('Failed to populate the database.\n');
+			console.log(err);
+			process.exit(1);
+		});
+		return;
+	case 'server':
+	default:
+		// Start the server
+		require('./server');
+}

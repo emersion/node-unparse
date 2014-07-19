@@ -1,4 +1,7 @@
 {
+	"database": {
+		"uri": "mongodb://localhost/unparse"
+	},
 	"appId": "",
 	"javascriptKey": "",
 	"restKey": ""
