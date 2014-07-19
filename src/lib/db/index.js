@@ -29,42 +29,6 @@ function ensureClassExists(className, deferred) {
 	return true;
 }
 
-module.exports.insertObject = function (className, objectData) {
-	var deferred = Q.defer();
-
-	if (!ensureClassExists(className, deferred)) {
-		return deferred.promise;
-	}
-
-	// If we're inserting a new class, check that we can load the corresponding model
-	if (className == '__Class') {
-		try {
-			models.loadModel(objectData);
-		} catch (e) {
-			deferred.reject({
-				error: e.getMessage()
-			});
-			return deferred.promise;
-		}
-	}
-
-	var object = new models[className](objectData);
-
-	object.save(function (err, object) {
-		if (err) {
-			models.unloadModel(objectData.name);
-
-			deferred.reject({
-				error: 'cannot insert object: '+err
-			});
-		} else {
-			deferred.resolve(object);
-		}
-	});
-
-	return deferred.promise;
-};
-
 module.exports.retrieveObject = function (className, objectId) {
 	var deferred = Q.defer();
 
@@ -113,6 +77,43 @@ module.exports.queryObjects = function (className, opts) {
 	return deferred.promise;
 };
 
+module.exports.insertObject = function (className, objectData) {
+	var deferred = Q.defer();
+
+	if (!ensureClassExists(className, deferred)) {
+		return deferred.promise;
+	}
+
+	// If we're inserting a new class, check that we can load the corresponding model
+	if (className == '__Class') {
+		try {
+			models.loadModel(objectData);
+		} catch (e) {
+			deferred.reject({
+				error: e.getMessage()
+			});
+			return deferred.promise;
+		}
+	}
+
+	var object = new models[className](objectData);
+
+	object.save(function (err, object) {
+		if (err) {
+			// The class was not created as expected, unload the model
+			models.unloadModel(objectData.name);
+
+			deferred.reject({
+				error: 'cannot insert object: '+err
+			});
+		} else {
+			deferred.resolve(object);
+		}
+	});
+
+	return deferred.promise;
+};
+
 module.exports.updateObject = function (className, objectId, objectData) {
 	var deferred = Q.defer();
 
@@ -126,6 +127,12 @@ module.exports.updateObject = function (className, objectId, objectData) {
 				error: 'cannot update object: '+err
 			});
 		} else {
+			// Unload and reload the class when updated
+			if (className == '__Class') {
+				models.unloadModel(object.name);
+				models.loadModel(object);
+			}
+
 			deferred.resolve(object);
 		}
 	});
@@ -146,6 +153,7 @@ module.exports.deleteObject = function (className, objectId) {
 				error: 'cannot delete object: '+err
 			});
 		} else {
+			// Unload the class when deleted
 			if (className == '__Class') {
 				models.unloadModel(object.name);
 			}
