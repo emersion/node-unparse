@@ -8,6 +8,7 @@ var session = require('cookie-session');
 var api = require('./lib/api');
 var app = module.exports = express();
 
+app.set('env', 'development');
 app.set('port', process.env.PORT || 3000);
 //app.use(express.logger('dev'));
 app.use(bodyParser.json());
@@ -16,10 +17,11 @@ app.use(session({
 	keys: ['abc', 'def']
 }));
 //app.use(express.compress());
-app.use(function(req, res) {
+app.use(function (req, res, next) {
 	res.setHeader('Access-Control-Allow-Origin', '*');
+	next();
 });
-app.use(function(req, res) { // Authentication
+app.use(function (req, res, next) { // Authentication
 	var auth = {
 		appId: req.get('X-Parse-Application-Id') || '',
 		javascriptKey: req.get('X-Parse-Javascript-API-Key') || '',
@@ -48,8 +50,13 @@ app.use(function(req, res) { // Authentication
 	}
 
 	// TODO: check auth
+	next();
 });
 app.use(api);
+app.use(function(err, req, res, next){
+	console.error(err.stack);
+	res.send(500, 'Something broke!');
+});
 
 if ('development' === app.get('env')) {
   app.use(errorhandler());
