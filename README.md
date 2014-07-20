@@ -32,6 +32,19 @@ Features
 - [ ] Files
 - [ ] Cloud functions, cloud code
 
+Running the server
+------------------
+
+Start the server:
+```
+./unparse
+```
+
+Initialize the database with default classes:
+```
+./unparse init
+```
+
 Using Parse Javascript SDK
 --------------------------
 
