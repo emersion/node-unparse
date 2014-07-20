@@ -5,6 +5,8 @@ An open-source clone of Parse, using MongoDB as database and implemented with No
 
 See https://www.parse.com/docs/rest for the REST API documentation. Unparse should be compatible with it and existing Parse SDKs (e.g. with the [Javascript SDK](https://parse.com/docs/js_guide)).
 
+> Warning! This software is still in an early development stage. Use only for test purposes!
+
 Features
 --------
 
@@ -16,8 +18,16 @@ Features
 - [ ] Querying objects (relationnal queries)
 - [x] API keys and authentication
 - [ ] Access Control Lists (ACL)
-- [ ] Pointers
 - [ ] Users
+  - [x] Signup
+  - [x] Login
+  - [ ] Password hashing
+  - [ ] Retrieving current user
+  - [ ] Querying users
+  - [ ] Updating users
+  - [ ] Requesting a password reset
+  - [ ] Deleting users
+- [ ] Pointers
 - [ ] Roles
 - [ ] Files
 - [ ] Cloud functions, cloud code
