@@ -22,7 +22,7 @@ Features
   - [x] Signup
   - [x] Login
   - [ ] Password hashing
-  - [ ] Retrieving current user
+  - [x] Retrieving current user
   - [ ] Querying users
   - [ ] Updating users
   - [ ] Requesting a password reset
