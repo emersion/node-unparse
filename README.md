@@ -21,7 +21,7 @@ Features
 - [ ] Users
   - [x] Signup
   - [x] Login
-  - [ ] Password hashing
+  - [x] Password hashing
   - [x] Retrieving current user
   - [ ] Querying users
   - [ ] Updating users
