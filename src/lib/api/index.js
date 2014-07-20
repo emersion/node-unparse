@@ -3,6 +3,7 @@ var express = require('express');
 var app = module.exports = express();
 var extend = require('extend');
 var crypto = require('crypto');
+var Q = require('q');
 
 var path = require('path');
 var db = require('../db');
@@ -167,11 +168,15 @@ app.put('/1/classes/:className/:objectId', function(req, res) { // Update object
 		objectId = req.param('objectId'),
 		objectData = req.body;
 
+	// TODO: ACL
+
 	api.call('updateObject', [className, objectId, objectData], res);
 });
 app.delete('/1/classes/:className/:objectId', function(req, res) { // Delete object
 	var className = req.param('className'),
 		objectId = req.param('objectId');
+
+	// TODO: ACL
 
 	api.call('deleteObject', [className, objectId], res);
 });
@@ -192,10 +197,7 @@ app.get('/1/login', function(req, res) { // Logging in
 		username: username
 	}, function (err, user) {
 		if (err) {
-			var promise = Q.try(function () {
-				throw invalidCredentials();
-			});
-			api.catch(res, promise);
+			api.catch(res, Q.reject(invalidCredentials()));
 			return;
 		}
 
@@ -248,7 +250,11 @@ app.get('/1/users/:objectId', function(req, res) { // Retrieving users
 	api.when(res, promise);
 });
 app.get('/1/users', function(req, res) { // Querying Users
-	res.send(501, { error: 'not implemented' });
+	var opts = extend({}, req.query, req.body);
+
+	// TODO: parse JSON in req.query.where
+
+	api.call('queryObjects', ['_User', opts], res);
 });
 app.post('/1/users', function(req, res) { // Signing up, linking users
 	var userData = req.body,
@@ -282,7 +288,30 @@ app.post('/1/users', function(req, res) { // Signing up, linking users
 	api.catch(res, promise);
 });
 app.put('/1/users/:objectId', function(req, res) { // Updating Users, Linking Users, Verifying Emails
-	res.send(501, { error: 'not implemented' });
+	var objectId = req.param('objectId'),
+		userData = req.body;
+
+	// TODO: ACL
+	if (!req.user || req.user.id !== objectId) {
+		api.catch(res, Q.reject(new ApiError('unauthorized', 401)));
+		return;
+	}
+
+	function updateUser(userData) {
+		return api.call('updateObject', ['_User', objectId, userData], res);
+	}
+
+	if (userData.password) { // Password changed? Hash it!
+		var promise = hasher.hash(userData.password).then(function (hash) {
+			userData.password = hash;
+
+			// Then, update the user
+			updateUser(userData);
+		});
+		api.catch(res, promise);
+	} else {
+		updateUser(userData);
+	}
 });
 app.post('/1/requestPasswordReset', function(req, res) {
 	var email = req.param('email');
@@ -290,12 +319,14 @@ app.post('/1/requestPasswordReset', function(req, res) {
 	// Requesting a password reset
 	res.send(501, { error: 'not implemented' });
 });
-app.delete('/1/users/:objectId', function(req, res) {
-	// Deleting users
+app.delete('/1/users/:objectId', function(req, res) { // Deleting users
+	// TODO: ACL
+
 	res.send(501, { error: 'not implemented' });
 });
 
 // Roles
+// TODO
 
 // Files
 app.post('/1/files/:fileName', function(req, res) {
