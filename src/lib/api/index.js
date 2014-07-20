@@ -263,11 +263,19 @@ app.post('/1/users', function(req, res) { // Signing up, linking users
 	// TODO: check if the user is not already logged in?
 
 	console.log('Inserting a new user');
-	
-	// First, hash password
-	var promise = hasher.hash(userData.password).then(function (hash) {
-		userData.password = hash;
 
+	// First, hash password if present
+	var promise;
+	if (userData.password) {
+		promise = hasher.hash(userData.password).then(function (hash) {
+			userData.password = hash;
+			return userData;
+		})
+	} else {
+		promise = Q(userData);
+	}
+
+	promise.then(function (userData) {
 		// Then, insert the user
 		return api.insertObject('_User', userData);
 	}).then(function (creationResult) {
@@ -313,16 +321,21 @@ app.put('/1/users/:objectId', function(req, res) { // Updating Users, Linking Us
 		updateUser(userData);
 	}
 });
-app.post('/1/requestPasswordReset', function(req, res) {
+app.post('/1/requestPasswordReset', function(req, res) { // Requesting a password reset
 	var email = req.param('email');
 
-	// Requesting a password reset
 	res.send(501, { error: 'not implemented' });
 });
 app.delete('/1/users/:objectId', function(req, res) { // Deleting users
-	// TODO: ACL
+	var objectId = req.param('objectId');
 
-	res.send(501, { error: 'not implemented' });
+	// TODO: ACL
+	if (!req.user || req.user.id !== objectId) {
+		api.catch(res, Q.reject(new ApiError('unauthorized', 401)));
+		return;
+	}
+
+	api.call('deleteObject', ['_User', objectId], res);
 });
 
 // Roles

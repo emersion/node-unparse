@@ -189,12 +189,10 @@ controller.init = function () {
 		fields: [{
 			name: 'username',
 			type: 'String',
-			unique: true,
-			required: true
+			unique: true
 		}, {
 			name: 'password',
-			type: 'String',
-			required: true
+			type: 'String'
 		}, {
 			name: 'email',
 			type: 'String',
@@ -202,6 +200,9 @@ controller.init = function () {
 		}, {
 			name: 'sessionToken',
 			type: 'String'
+		}, {
+			name: 'authData',
+			type: 'Object'
 		}]
 	}/*, {
 		name: '_Role',
