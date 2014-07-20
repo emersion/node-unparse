@@ -40,6 +40,10 @@ controller.connect = function () {
 	return deferred.promise;
 };
 
+controller.model = function (className) {
+	return models[className];
+};
+
 controller.retrieveObject = function (className, objectId) {
 	var deferred = Q.defer();
 
@@ -47,7 +51,7 @@ controller.retrieveObject = function (className, objectId) {
 		return deferred.promise;
 	}
 
-	models[className].findById(objectId, function (err, object) {
+	this.model(className).findById(objectId, function (err, object) {
 		if (err) {
 			deferred.reject({
 				error: 'cannot retrieve object: '+err
@@ -75,7 +79,7 @@ controller.queryObjects = function (className, opts) {
 			limit: opts.limit || undefined //TODO: support falsy values (0)
 		};
 
-	models[className].find(conditions, fields, options, function (err, results) {
+	this.model(className).find(conditions, fields, options, function (err, results) {
 		if (err) {
 			deferred.reject({
 				error: 'cannot query objects: '+err
@@ -107,7 +111,7 @@ controller.insertObject = function (className, objectData) {
 		}
 	}
 
-	var object = new models[className](objectData);
+	var object = new this.model(className)(objectData);
 
 	object.save(function (err, object) {
 		if (err) {
@@ -132,7 +136,7 @@ controller.updateObject = function (className, objectId, objectData) {
 		return deferred.promise;
 	}
 
-	models[className].findByIdAndUpdate(objectId, objectData, function (err, object) {
+	this.model(className).findByIdAndUpdate(objectId, objectData, function (err, object) {
 		if (err) {
 			deferred.reject({
 				error: 'cannot update object: '+err
@@ -158,7 +162,7 @@ controller.deleteObject = function (className, objectId) {
 		return deferred.promise;
 	}
 
-	models[className].findByIdAndRemove(objectId, function (err, object) {
+	this.model(className).findByIdAndRemove(objectId, function (err, object) {
 		if (err) {
 			deferred.reject({
 				error: 'cannot delete object: '+err
@@ -190,6 +194,12 @@ controller.init = function () {
 			type: 'String'
 		}, {
 			name: 'email',
+			type: 'String'
+		}, {
+			name: 'sessionToken',
+			type: 'String'
+		}, {
+			name: 'bcryptPassword',
 			type: 'String'
 		}]
 	}/*, {

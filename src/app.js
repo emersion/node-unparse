@@ -1,6 +1,7 @@
 var express = require('express');
 var path = require('path');
 var bodyParser = require('body-parser');
+var methodOverride = require('method-override');
 var errorhandler = require('errorhandler');
 //var cookieParser = require('cookie-parser');
 var session = require('cookie-session');
@@ -13,27 +14,42 @@ app.set('port', process.env.PORT || 3000);
 //app.use(express.logger('dev'));
 app.use(bodyParser.json());
 //app.use(cookieParser());
-app.use(session({
-	keys: ['abc', 'def']
-}));
+app.use(session(config.session));
 //app.use(express.compress());
+app.use(methodOverride(function(req, res) {
+	if (req.body && typeof req.body === 'object' && '_method' in req.body) {
+		var method = req.body._method;
+		delete req.body._method;
+		return method;
+	}
+}));
 app.use(function (req, res, next) {
 	res.setHeader('Access-Control-Allow-Origin', '*');
 	next();
 });
-app.use(function (req, res, next) { // Authentication
+app.use(function (req, res, next) { // App authentication
 	// Authentication with headers
-	var auth = {
+	var appAuth = {
 		appId: req.get('X-Parse-Application-Id') || '',
 		javascriptKey: req.get('X-Parse-Javascript-API-Key') || '',
 		restKey: req.get('X-Parse-REST-API-Key') || ''
 	};
 
 	// Authentication with basic HTTP authentication
-	if (req.body.username && req.body.password) {
-		auth.appId = req.body.username;
+	// @see https://gist.github.com/charlesdaniel/1686663
+	if (req.headers['authorization']) {
+		// auth is in base64(username:password)  so we need to decode the base64
+		// Split on a space, the original auth looks like  "Basic Y2hhcmxlczoxMjM0NQ==" and we need the 2nd part
+		var base64 = auth.split(' ')[1];
+		var buf = new Buffer(base64, 'base64');
+		var credentials = buf.toString().split(':');
 
-		var passwdFields = req.body.password.split('&');
+		var username = credentials[0],
+			password = credentials[1];
+
+		appAuth.appId = username;
+
+		var passwdFields = password.split('&');
 		for (var i = 0; i < passwdFields.length; i++) {
 			var field = passwdFields[i],
 				fieldParts = field.split('=', 2),
@@ -42,21 +58,32 @@ app.use(function (req, res, next) { // Authentication
 
 			switch (fieldName) {
 				case 'javascript-key':
-					auth.javascriptKey = fieldVal;
+					appAuth.javascriptKey = fieldVal;
 					break;
 				case 'rest-key':
-					auth.javascriptKey = fieldVal;
+					appAuth.restKey = fieldVal;
 					break;
+			}
+		}
+	}
+
+	if (req.body && typeof req.body === 'object') {
+		// Authentication with request body fields
+		if (req.body._ApplicationId) {
+			appAuth.appId = req.body._ApplicationId;
+
+			if (req.body._JavaScriptKey) {
+				appAuth.javascriptKey = req.body._JavaScriptKey;
 			}
 		}
 	}
 
 	// Check API credentials
 	var authenticated = false;
-	if (config.appId == auth.appId) {
-		if (config.javascriptKey == auth.javascriptKey /*&& req.xhr*/) {
+	if (config.appId == appAuth.appId) {
+		if (config.javascriptKey == appAuth.javascriptKey) {
 			authenticated = true;
-		} else if (config.restKey == auth.restKey) {
+		} else if (config.restKey == appAuth.restKey) {
 			authenticated = true;
 		}
 	}

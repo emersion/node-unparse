@@ -4,5 +4,9 @@
 	},
 	"appId": "",
 	"javascriptKey": "",
-	"restKey": ""
+	"restKey": "",
+	"session": {
+		"name": "unparse",
+		"keys": ["change", "this"]
+	}
 }
