@@ -20,6 +20,27 @@ Features
 - [ ] Users
 - [ ] Roles
 - [ ] Files
+- [ ] Cloud functions, cloud code
+
+Using Parse Javascript SDK
+--------------------------
+
+You can use the official Parse Javascript SDK ([quickstart](https://parse.com/apps/quickstart#parse_data/web)) with Unparse:
+```js
+Parse.serverURL = 'https://api.unparse.org'; // Change this to your Unparse server URL
+Parse.initialize("appId", "javascriptKey"); // Replace with your application ID and your Javascript API key (defined in src/config/)
+
+// You can now play around with the SDK
+var TestObject = Parse.Object.extend("TestObject");
+var testObject = new TestObject();
+testObject.save({foo: "bar"}).then(function(object) {
+  alert("yay! it worked");
+});
+```
+
+> Note: we're maintaining a Bower package for the Parse JS SDK: https://github.com/unparse/parse-js-sdk
+>
+> You can install the SDK by running `bower install parse-sdk`.
 
 Under the hood
 --------------
