@@ -23,8 +23,8 @@ Features
   - [x] Login
   - [x] Password hashing
   - [x] Retrieving current user
-  - [ ] Querying users
-  - [ ] Updating users
+  - [x] Querying users
+  - [x] Updating users
   - [ ] Requesting a password reset
   - [ ] Deleting users
 - [ ] Pointers
