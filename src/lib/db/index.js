@@ -188,18 +188,19 @@ controller.init = function () {
 		name: '_User',
 		fields: [{
 			name: 'username',
-			type: 'String'
+			type: 'String',
+			unique: true,
+			required: true
 		}, {
 			name: 'password',
-			type: 'String'
+			type: 'String',
+			required: true
 		}, {
 			name: 'email',
-			type: 'String'
+			type: 'String',
+			unique: true
 		}, {
 			name: 'sessionToken',
-			type: 'String'
-		}, {
-			name: 'bcryptPassword',
 			type: 'String'
 		}]
 	}/*, {

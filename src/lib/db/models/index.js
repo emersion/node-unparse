@@ -50,14 +50,13 @@ module.exports.loadModel = function (classData, methods) {
 
 	console.log('Loading model '+name);
 
-	//TODO: add objectId, remove __v
 	var def = {
-		objectId: Schema.Types.ObjectId,
 		createdAt: Date,
 		updatedAt: Date,
 		ACL: Object
 	};
 
+	// TODO: schema as an Object
 	for (var i = 0; i < fields.length; i++) {
 		var field = fields[i];
 
@@ -65,7 +64,11 @@ module.exports.loadModel = function (classData, methods) {
 			continue;
 		}
 
-		def[field.name] = parseType(field.type);
+		def[field.name] = {
+			type: parseType(field.type),
+			unique: (field.unique) ? true : false,
+			required: (field.required) ? true : false
+		};
 	}
 
 	var schema = new Schema(def);
@@ -108,6 +111,9 @@ module.exports.loadBaseModels = function () {
 		}, {
 			name: 'fields',
 			type: [{ name: String, type: { type: String } }]
+		}, {
+			name: 'ACL',
+			type: Object
 		}]
 	});
 };

@@ -3,9 +3,17 @@ var express = require('express');
 var app = module.exports = express();
 var extend = require('extend');
 var crypto = require('crypto');
+
 var path = require('path');
 var db = require('../db');
 var serializer = require('./serializer');
+var hasher = require('../hasher');
+
+function ApiError(msg, code) {
+	this.name = 'ApiError';
+	this.message = msg;
+	this.code = code || 400;
+}
 
 function generateSessionToken() {
 	var sha = crypto.createHash('sha1');
@@ -19,7 +27,7 @@ api.queryObjects = function (className, opts) {
 	return db.queryObjects(className, opts).then(function (data) {
 		// Serialize objects
 		for (var i = 0; i < data.results.length; i++) {
-			data.results[i] = serializer.object(data.results[i]);
+			data.results[i] = serializer.serialize(data.results[i]);
 		}
 
 		return data;
@@ -28,7 +36,7 @@ api.queryObjects = function (className, opts) {
 
 api.retrieveObject = function (className, objectId) {
 	return db.retrieveObject(className, objectId).then(function (object) {
-		return serializer.object(object);
+		return serializer.serialize(object);
 	});
 };
 
@@ -57,7 +65,15 @@ api.deleteObject = function (className, objectId) {
 
 api.catch = function (res, promise) {
 	return promise.catch(function (err) {
-		res.send(400, err);
+		var code = 400,
+			msg = err;
+
+		if (err && err instanceof ApiError) {
+			code = err.code;
+			msg = err.message;
+		}
+
+		res.send(code, { error: msg });
 	});
 };
 api.when = function (res, promise) {
@@ -167,7 +183,7 @@ app.get('/1/login', function(req, res) { // Logging in
 
 	function invalidCredentials() {
 		// TODO: add a little delay to prevent bruteforce attacks
-		res.send(404, { error: 'invalid login parameters' });
+		return new ApiError('invalid login parameters', 404);
 	}
 
 	// TODO: check if the user is not already logged in?
@@ -176,32 +192,43 @@ app.get('/1/login', function(req, res) { // Logging in
 		username: username
 	}, function (err, user) {
 		if (err) {
-			invalidCredentials();
+			var promise = Q.try(function () {
+				throw invalidCredentials();
+			});
+			api.catch(res, promise);
 			return;
 		}
 
 		// Check password
-		// TODO: hash password
-		if (user.password !== password) {
-			invalidCredentials();
-			return;
-		}
+		var promise = hasher.compare(password, user.password).then(function (isCorrect) {
+			if (!isCorrect) {
+				throw invalidCredentials();
+			}
 
-		// TODO: when do we refresh the session token?
-		var result = serializer.user(user);
-		if (user.sessionToken) {
-			result.sessionToken = user.sessionToken;
+			// TODO: check if password needs rehash
+
+			// TODO: when do we refresh the session token?
+
+			var result = serializer.serialize(user);
+			if (user.sessionToken) { // Session token already generated
+				result.sessionToken = user.sessionToken;
+				return result;
+			} else { // No session token available
+				result.sessionToken = generateSessionToken();
+
+				return api.updateObject('_User', result.objectId, {
+					sessionToken: result.sessionToken
+				}).then(function () {
+					return result;
+				});
+			}
+		}, function (err) {
+			console.warn('Cannot verify password hash: ', err);
+			throw invalidCredentials();
+		}).then(function (result) {
 			res.send(result);
-		} else {
-			result.sessionToken = generateSessionToken();
-			
-			var promise = api.updateObject('_User', result.objectId, {
-				sessionToken: result.sessionToken
-			}).then(function () {
-				res.send(result);
-			});
-			api.catch(res, promise);
-		}
+		});
+		api.catch(res, promise);
 	});
 });
 app.get('/1/users/me', function(req, res) { // Validating Session Tokens, Retrieving Current User
@@ -210,13 +237,13 @@ app.get('/1/users/me', function(req, res) { // Validating Session Tokens, Retrie
 		return;
 	}
 
-	res.send(serializer.user(req.user));
+	res.send(serializer.serialize(req.user));
 });
 app.get('/1/users/:objectId', function(req, res) { // Retrieving users
 	var objectId = req.param('objectId');
 
 	var promise = db.retrieveObject('_User', objectId).then(function (object) {
-		return serializer.user(object);
+		return serializer.serialize(object);
 	});
 	api.when(res, promise);
 });
@@ -230,7 +257,14 @@ app.post('/1/users', function(req, res) { // Signing up, linking users
 	// TODO: check if the user is not already logged in?
 
 	console.log('Inserting a new user');
-	var promise = api.insertObject('_User', userData).then(function (creationResult) {
+	
+	// First, hash password
+	var promise = hasher.hash(userData.password).then(function (hash) {
+		userData.password = hash;
+
+		// Then, insert the user
+		return api.insertObject('_User', userData);
+	}).then(function (creationResult) {
 		// User created, we can generate the session token
 		result = extend({}, creationResult, {
 			sessionToken: generateSessionToken()
@@ -242,13 +276,12 @@ app.post('/1/users', function(req, res) { // Signing up, linking users
 		});
 	}).then(function () {
 		res
-		//.location('/1/users/'+user._id)
+		//.location('/1/users/'+result.objectId)
 		.send(201, result);
 	});
 	api.catch(res, promise);
 });
-app.put('/1/users/:objectId', function(req, res) {
-	// Updating Users, Linking Users, Verifying Emails
+app.put('/1/users/:objectId', function(req, res) { // Updating Users, Linking Users, Verifying Emails
 	res.send(501, { error: 'not implemented' });
 });
 app.post('/1/requestPasswordReset', function(req, res) {
