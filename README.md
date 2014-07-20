@@ -20,6 +20,23 @@ Features
 - [ ] Users
 - [ ] Roles
 - [ ] Files
+- [ ] Cloud functions, cloud code
+
+Using Parse Javascript SDK
+--------------------------
+
+You can use the official Parse Javascript SDK ([quickstart](https://parse.com/apps/quickstart#parse_data/web)) with Unparse:
+```js
+Parse.serverURL = 'https://api.unparse.org'; // Change this to your Unparse server URL
+Parse.initialize("appId", "javascriptKey"); // Replace with your application ID and your Javascript API key (defined in src/config/)
+
+// You can now play around with the SDK
+var TestObject = Parse.Object.extend("TestObject");
+var testObject = new TestObject();
+testObject.save({foo: "bar"}).then(function(object) {
+  alert("yay! it worked");
+});
+```
 
 Under the hood
 --------------
