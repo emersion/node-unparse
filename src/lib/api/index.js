@@ -204,8 +204,24 @@ app.get('/1/login', function(req, res) { // Logging in
 		}
 	});
 });
-app.get('/1/users', function(req, res) {
-	// Querying Users
+app.get('/1/users/me', function(req, res) { // Validating Session Tokens, Retrieving Current User
+	if (!req.user) {
+		res.send(403, { error: 'invalid session' });
+		return;
+	}
+
+	res.send(serializer.user(req.user));
+});
+app.get('/1/users/:objectId', function(req, res) { // Retrieving users
+	var objectId = req.param('objectId');
+
+	var promise = db.retrieveObject('_User', objectId).then(function (object) {
+		return serializer.user(object);
+	});
+	api.when(res, promise);
+});
+app.get('/1/users', function(req, res) { // Querying Users
+	res.send(501, { error: 'not implemented' });
 });
 app.post('/1/users', function(req, res) { // Signing up, linking users
 	var userData = req.body,
@@ -231,25 +247,25 @@ app.post('/1/users', function(req, res) { // Signing up, linking users
 	});
 	api.catch(res, promise);
 });
-app.get('/1/users/me', function(req, res) {
-	// Validating Session Tokens, Retrieving Current User
-});
-app.get('/1/users/:objectId', function(req, res) {
-	// Retrieving users
-});
 app.put('/1/users/:objectId', function(req, res) {
 	// Updating Users, Linking Users, Verifying Emails
+	res.send(501, { error: 'not implemented' });
 });
 app.post('/1/requestPasswordReset', function(req, res) {
-	// Requesting A Password Reset
+	var email = req.param('email');
+
+	// Requesting a password reset
+	res.send(501, { error: 'not implemented' });
 });
 app.delete('/1/users/:objectId', function(req, res) {
-	// Deleting Users
+	// Deleting users
+	res.send(501, { error: 'not implemented' });
 });
 
 // Roles
 
 // Files
-/*app.post('/1/files/:fileName', function(req, res) {
+app.post('/1/files/:fileName', function(req, res) {
 	// Uploading Files
-});*/
+	res.send(501, { error: 'not implemented' });
+});
