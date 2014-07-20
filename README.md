@@ -71,7 +71,7 @@ Under the hood
 Classes are stored in the `__Class` collection, which is present by default and is not overridable.
 
 Default classes properties are:
-* `objectId`: the object unique ID (not implemented for the moment, use `_id`)
+* `objectId`: the object unique ID
 * `createdAt`: the object's creation date
 * `updatedAt`: the object's last update date
 * `ACL`: for Access Control Lists
