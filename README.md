@@ -38,6 +38,9 @@ testObject.save({foo: "bar"}).then(function(object) {
 });
 ```
 
+> Note: we're maintaining a Bower package for the Parse JS SDK: https://github.com/unparse/parse-js-sdk
+> You can install the SDK by running `bower install parse-sdk`.
+
 Under the hood
 --------------
 
