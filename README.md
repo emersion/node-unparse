@@ -26,7 +26,7 @@ Features
   - [x] Querying users
   - [x] Updating users
   - [ ] Requesting a password reset
-  - [ ] Deleting users
+  - [x] Deleting users
 - [ ] Pointers
 - [ ] Roles
 - [ ] Files
