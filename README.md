@@ -27,7 +27,8 @@ Features
   - [x] Updating users
   - [ ] Requesting a password reset
   - [x] Deleting users
-- [ ] Pointers
+- [ ] Pointers (one-to-one)
+- [ ] Relations (one-to-many)
 - [ ] Roles
 - [ ] Files
 - [ ] Cloud functions, cloud code
