@@ -1,6 +1,8 @@
 var mongoose = require('mongoose');
 var Q = require('q');
 var EventEmitter = require('events').EventEmitter;
+var extend = require('extend');
+
 var models = require('./models');
 var config = require('../../config');
 
@@ -71,15 +73,26 @@ controller.queryObjects = function (className, opts) {
 		return deferred.promise;
 	}
 
-	var conditions = opts.where || undefined,
-		fields = opts.keys || undefined,
-		options = { //TODO: opts.include, opts.count
-			sort: opts.order || undefined,
-			skip: opts.skip || undefined,
-			limit: opts.limit || undefined //TODO: support falsy values (0)
-		};
+	var model = this.model(className),
+		conditions = opts.where,
+		fields = opts.keys,
+		options = {
+			sort: opts.order,
+			skip: opts.skip,
+			limit: (opts.limit) ? parseInt(opts.limit) : undefined
+		},
+		populate = opts.include || '',
+		count = (opts.count) ? parseInt(opts.count) : 0;
 
-	this.model(className).find(conditions, fields, options, function (err, results) {
+	var query = model.find(conditions, fields, options);
+
+	if (populate) {
+		populate.split(',').forEach(function (path) {
+			query.populate(path);
+		});
+	}
+
+	query.exec(function (err, results) {
 		if (err) {
 			deferred.reject({
 				error: 'cannot query objects: '+err
@@ -89,7 +102,27 @@ controller.queryObjects = function (className, opts) {
 		}
 	});
 
-	return deferred.promise;
+	if (count) {
+		var countDeferred = Q.defer();
+
+		var countQuery = model.find(conditions).count();
+		countQuery.exec(function (err, count) {
+			if (err) {
+				countDeferred.reject({
+					error: 'cannot count objects: '+err
+				});
+			} else {
+				deferred.resolve({ count: count });
+			}
+		});
+
+		return Q.spread([deferred.promise, countDeferred.promise], function (queryResult, countResult) {
+			return extend(queryResult, countResult);
+		});
+	} else {
+		return deferred.promise;
+	}
+
 };
 
 controller.insertObject = function (className, objectData) {

@@ -67,7 +67,8 @@ module.exports.loadModel = function (classData, methods) {
 		def[field.name] = {
 			type: parseType(field.type),
 			unique: (field.unique) ? true : false,
-			required: (field.required) ? true : false
+			required: (field.required) ? true : false,
+			ref: field.ref
 		};
 	}
 

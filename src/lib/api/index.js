@@ -250,9 +250,14 @@ app.get('/1/users/:objectId', function(req, res) { // Retrieving users
 	api.when(res, promise);
 });
 app.get('/1/users', function(req, res) { // Querying Users
-	var opts = extend({}, req.query, req.body);
+	// Try to parse JSON in the "where" parameter
+	if (typeof req.query == 'object' && typeof req.query.where == 'string') {
+		try {
+			req.query.where = JSON.parse(req.query.where);
+		} catch (e) {}
+	}
 
-	// TODO: parse JSON in req.query.where
+	var opts = extend({}, req.query, req.body);
 
 	api.call('queryObjects', ['_User', opts], res);
 });
@@ -342,7 +347,16 @@ app.delete('/1/users/:objectId', function(req, res) { // Deleting users
 // TODO
 
 // Files
+// @see https://www.parse.com/docs/rest#files
 app.post('/1/files/:fileName', function(req, res) {
 	// Uploading Files
+	res.send(501, { error: 'not implemented' });
+});
+
+// Cloud functions
+app.post('/1/functions/:functionName', function(req, res) { // Call a cloud function
+	res.send(501, { error: 'not implemented' });
+});
+app.post('/1/jobs/:jobName', function(req, res) { // Start a background job
 	res.send(501, { error: 'not implemented' });
 });
