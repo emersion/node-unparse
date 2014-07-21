@@ -68,7 +68,7 @@ module.exports.loadModel = function (classData, methods) {
 			type: parseType(field.type),
 			unique: (field.unique) ? true : false,
 			required: (field.required) ? true : false,
-			ref: field.ref
+			ref: field.ref //TODO: https://www.parse.com/docs/rest#queries
 		};
 	}
 

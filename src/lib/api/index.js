@@ -10,12 +10,22 @@ var db = require('../db');
 var serializer = require('./serializer');
 var hasher = require('../hasher');
 
+/**
+ * An API error.
+ * @param {String} msg  The error message.
+ * @param {Number} code The HTTP error code.
+ * @see https://en.wikipedia.org/wiki/List_of_HTTP_status_codes
+ */
 function ApiError(msg, code) {
 	this.name = 'ApiError';
 	this.message = msg;
 	this.code = code || 400;
 }
 
+/**
+ * Generate a session token.
+ * @return {String} The session token.
+ */
 function generateSessionToken() {
 	var sha = crypto.createHash('sha1');
 	sha.update(Math.random().toString());
@@ -137,6 +147,7 @@ app.use(function (req, res, next) {
 });
 
 // Objects
+// @see https://www.parse.com/docs/rest#objects
 app.get('/1/classes/:className', function(req, res) { // Query objects
 	var className = req.param('className'),
 		opts = extend({}, req.query, req.body);
@@ -182,6 +193,7 @@ app.delete('/1/classes/:className/:objectId', function(req, res) { // Delete obj
 });
 
 // Users
+// @see https://www.parse.com/docs/rest#users
 app.get('/1/login', function(req, res) { // Logging in
 	var username = req.param('username'),
 		password = req.param('password');
@@ -344,7 +356,28 @@ app.delete('/1/users/:objectId', function(req, res) { // Deleting users
 });
 
 // Roles
-// TODO
+// @see https://www.parse.com/docs/rest#roles
+app.get('/1/roles', function(req, res) { // Querying roles
+	res.send(501, { error: 'not implemented' });
+});
+app.post('/1/roles', function(req, res) { // Creating roles
+	res.send(501, { error: 'not implemented' });
+});
+app.get('/1/roles/:objectId', function(req, res) { // Retrieving roles
+	var objectId = req.param('objectId');
+
+	res.send(501, { error: 'not implemented' });
+});
+app.put('/1/roles/:objectId', function(req, res) { // Updating roles
+	var objectId = req.param('objectId');
+
+	res.send(501, { error: 'not implemented' });
+});
+app.delete('/1/roles/:objectId', function(req, res) { // Deleting roles
+	var objectId = req.param('objectId');
+
+	res.send(501, { error: 'not implemented' });
+});
 
 // Files
 // @see https://www.parse.com/docs/rest#files
