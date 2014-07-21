@@ -21,6 +21,9 @@ function ApiError(msg, code) {
 	this.message = msg;
 	this.code = code || 400;
 }
+ApiError.unauthorized = function () {
+	return new ApiError('unauthorized', 401);
+};
 
 /**
  * Generate a session token.
@@ -34,69 +37,133 @@ function generateSessionToken() {
 
 var api = {};
 
-api.queryObjects = function (className, opts) {
-	return db.queryObjects(className, opts).then(function (data) {
+// Working with promises and responses
+api.rejected = function (err, res) {
+	var code = 400,
+		msg = err;
+
+	if (err && err instanceof ApiError) {
+		code = err.code;
+		msg = err.message;
+	}
+
+	res.send(code, { error: msg });
+};
+api.catch = function (promise, res) {
+	return promise.catch(function (err) {
+		return api.rejected(err, res);
+	});
+};
+api.when = function (promise, res) {
+	return promise.then(function (result) {
+		res.send(result);
+	}, function (err) {
+		return api.rejected(err, res);
+	});
+};
+api.call = function (method, args, res) {
+	var promise = api[method].apply(this, args);
+	return api.when(promise, res);
+};
+
+// ACLs
+api.acl = {};
+api.acl.defaults = function (object) {
+	return {
+		'*': { read: true }
+	};
+};
+api.acl.get = function (object) {
+	return object.ACL || this.defaults(object);
+};
+api.acl.verify = function (object, user, operation) {
+	var acl = this.get(object),
+		userId = user.id();
+
+	// TODO: roles support: "role:Members":{"write":true}
+	var userGroups = [userId, '*'];
+
+	// The order of groups is important (more specific -> more general)
+	for (var i = 0; i < userGroups.length; i++) {
+		var group = userGroups[i];
+
+		if (acl[group] && typeof acl[group][operation] == 'boolean') {
+			return acl[group][operation];
+		}
+	}
+
+	return false;
+};
+api.acl.try = function (object, user, operation, previous) { // read, write
+	var promise = Q(previous || object);
+
+	promise.then(function (result) {
+		if (!api.acl.verify(object, user, operation)) {
+			throw ApiError.unauthorized();
+		}
+
+		return result;
+	});
+
+	return promise;
+};
+api.acl.tryForClass = function (className, user, operation) { // get, find, update. create, delete (and add fields?)
+	//TODO
+};
+
+// API functions, with ACL checks
+// TODO: check classes ACLs
+api.queryObjects = function (params, user) {
+	return db.queryObjects(params.className, params.options).then(function (data) {
 		// Serialize objects
 		for (var i = 0; i < data.results.length; i++) {
-			data.results[i] = serializer.serialize(data.results[i]);
+			var obj = data.results[i];
+
+			// Check ACL
+			if (!api.acl.verify(obj, user, 'read')) {
+				continue;
+			}
+
+			data.results[i] = serializer.serialize();
 		}
 
 		return data;
 	});
 };
-
-api.retrieveObject = function (className, objectId) {
-	return db.retrieveObject(className, objectId).then(function (object) {
+api.retrieveObject = function (params, user) {
+	return db.retrieveObject(params.className, params.objectId).then(function (object) {
+		return api.acl.try(object, user, 'read');
+	}).then(function (object) {
 		return serializer.serialize(object);
 	});
 };
-
-api.insertObject = function (className, objectData) {
-	return db.insertObject(className, objectData).then(function (object) {
+api.insertObject = function (params, user) {
+	return db.insertObject(params.className, params.objectData).then(function (object) {
 		return {
 			createdAt: object.createdAt,
-			objectId: object._id
+			objectId: object.id()
 		};
 	});
 };
-
-api.updateObject = function (className, objectId, objectData) {
-	return db.updateObject(className, objectId, objectData).then(function (object) {
+api.updateObject = function (params, user) {
+	return db.retrieveObject(params.className, params.objectId).then(function (object) {
+		return api.acl.try(object, user, 'write');
+	}).then(function (object) {
+		return db.updateObject(params.className, params.objectId, params.objectData);
+	}).then(function (object) {
 		return {
 			updatedAt: object.updatedAt
 		};
 	});
 };
-
-api.deleteObject = function (className, objectId) {
-	return db.deleteObject(className, objectId).then(function () {
+api.deleteObject = function (params, user) {
+	return db.retrieveObject(params.className, params.objectId).then(function (obj) {
+		return api.acl.try(obj, user, 'write');
+	}).then(function (obj) {
+		return db.deleteObject(params.className, params.objectId);
+	}).then(function () {
 		return; // Return nothing
 	});
-};
-
-api.catch = function (res, promise) {
-	return promise.catch(function (err) {
-		var code = 400,
-			msg = err;
-
-		if (err && err instanceof ApiError) {
-			code = err.code;
-			msg = err.message;
-		}
-
-		res.send(code, { error: msg });
-	});
-};
-api.when = function (res, promise) {
-	return promise.then(function (result) {
-		res.send(result);
-	}, function (err) {
-		res.send(400, err);
-	});
-};
-api.call = function (method, args, res) {
-	var promise = api[method].apply(this, args);
-	return api.when(res, promise);
 };
 
 // Connect to the database
@@ -134,10 +201,16 @@ app.use(function (req, res, next) {
 		db.model('_User').findOne({
 			sessionToken: userAuth.sessionToken
 		}, function (err, user) {
-			if (!err && user) {
-				req.user = user;
+			if (err) {
+				api.rejected(new ApiError('cannot find session token: '+err, 500), res);
+				return;
 			}
-			// TODO: print an error message if invalid session token
+			if (user) {
+				req.user = user;
+			} else {
+				api.rejected(new ApiError('invalid session token', 401), res);
+				return;
+			}
 			
 			next();
 		});
@@ -149,47 +222,59 @@ app.use(function (req, res, next) {
 // Objects
 // @see https://www.parse.com/docs/rest#objects
 app.get('/1/classes/:className', function(req, res) { // Query objects
-	var className = req.param('className'),
-		opts = extend({}, req.query, req.body);
+	// Try to parse JSON in the "where" parameter
+	if (typeof req.query == 'object' && typeof req.query.where == 'string') {
+		try {
+			req.query.where = JSON.parse(req.query.where);
+		} catch (e) {}
+	}
 
-	// TODO: parse JSON in req.query.where
+	var params = {
+		className: req.param('className'),
+		options: extend({}, req.query, req.body)
+	};
 
-	api.call('queryObjects', [className, opts], res);
+	api.call('queryObjects', [params, req.user], res);
 });
 app.get('/1/classes/:className/:objectId', function(req, res) { // Get object
-	var className = req.param('className'),
-		objectId = req.param('objectId');
+	var params = {
+		className: req.param('className'),
+		objectId: req.param('objectId')
+	};
 
-	api.call('retrieveObject', [className, objectId], res);
+	api.call('retrieveObject', [params, req.user], res);
 });
 app.post('/1/classes/:className', function(req, res, next) { // Create object
-	var className = req.param('className'),
-		objectData = req.body;
+	var params = {
+		className: req.param('className'),
+		objectData: req.body
+	};
 
 	console.log('Inserting a new '+className);
-	var promise = api.insertObject(className, objectData).then(function (result) {
+	api.insertObject(params, req.user).then(function (result) {
 		res
 		//.location('/1/classes/'+className+'/'+result.objectId)
 		.send(result);
+	}, function (err) {
+		return api.rejected(err, res);
 	});
-	api.catch(res, promise);
 });
 app.put('/1/classes/:className/:objectId', function(req, res) { // Update object
-	var className = req.param('className'),
-		objectId = req.param('objectId'),
-		objectData = req.body;
+	var params = {
+		className: req.param('className'),
+		objectId: req.param('objectId'),
+		objectData: req.body
+	};
 
-	// TODO: ACL
-
-	api.call('updateObject', [className, objectId, objectData], res);
+	api.call('updateObject', [params, req.user], res);
 });
 app.delete('/1/classes/:className/:objectId', function(req, res) { // Delete object
-	var className = req.param('className'),
-		objectId = req.param('objectId');
+	var params = {
+		className: req.param('className'),
+		objectId: req.param('objectId')
+	};
 
-	// TODO: ACL
-
-	api.call('deleteObject', [className, objectId], res);
+	api.call('deleteObject', [params, req.user], res);
 });
 
 // Users
@@ -203,14 +288,11 @@ app.get('/1/login', function(req, res) { // Logging in
 		return new ApiError('invalid login parameters', 404);
 	}
 
-	// TODO: check if the user is not already logged in?
-
 	db.model('_User').findOne({
 		username: username
 	}, function (err, user) {
 		if (err) {
-			api.catch(res, Q.reject(invalidCredentials()));
-			return;
+			return api.rejected(invalidCredentials(), res);
 		}
 
 		// Check password
@@ -223,6 +305,8 @@ app.get('/1/login', function(req, res) { // Logging in
 
 			// TODO: when do we refresh the session token?
 
+			// TODO: set session cookie (only if using Javascript SDK?)
+
 			var result = serializer.serialize(user);
 			if (user.sessionToken) { // Session token already generated
 				result.sessionToken = user.sessionToken;
@@ -230,25 +314,26 @@ app.get('/1/login', function(req, res) { // Logging in
 			} else { // No session token available
 				result.sessionToken = generateSessionToken();
 
-				return api.updateObject('_User', result.objectId, {
-					sessionToken: result.sessionToken
-				}).then(function () {
+				return api.updateObject({
+					className: '_User',
+					objectId: result.objectId,
+					objectData: {
+						sessionToken: result.sessionToken
+					}
+				}, req.user).then(function () {
 					return result;
 				});
 			}
 		}, function (err) {
 			console.warn('Cannot verify password hash: ', err);
 			throw invalidCredentials();
-		}).then(function (result) {
-			res.send(result);
 		});
-		api.catch(res, promise);
+		api.when(promise, res);
 	});
 });
 app.get('/1/users/me', function(req, res) { // Validating Session Tokens, Retrieving Current User
 	if (!req.user) {
-		res.send(403, { error: 'invalid session' });
-		return;
+		return api.rejected(new ApiError('invalid session', 403), res);
 	}
 
 	res.send(serializer.serialize(req.user));
@@ -259,7 +344,7 @@ app.get('/1/users/:objectId', function(req, res) { // Retrieving users
 	var promise = db.retrieveObject('_User', objectId).then(function (object) {
 		return serializer.serialize(object);
 	});
-	api.when(res, promise);
+	api.when(promise, res);
 });
 app.get('/1/users', function(req, res) { // Querying Users
 	// Try to parse JSON in the "where" parameter
@@ -269,15 +354,16 @@ app.get('/1/users', function(req, res) { // Querying Users
 		} catch (e) {}
 	}
 
-	var opts = extend({}, req.query, req.body);
+	var params = {
+		className: '_User',
+		options: extend({}, req.query, req.body)
+	};
 
-	api.call('queryObjects', ['_User', opts], res);
+	api.call('queryObjects', [params, req.user], res);
 });
 app.post('/1/users', function(req, res) { // Signing up, linking users
 	var userData = req.body,
 		result;
-
-	// TODO: check if the user is not already logged in?
 
 	console.log('Inserting a new user');
 
@@ -294,7 +380,10 @@ app.post('/1/users', function(req, res) { // Signing up, linking users
 
 	promise.then(function (userData) {
 		// Then, insert the user
-		return api.insertObject('_User', userData);
+		return api.insertObject({
+			className: '_User',
+			objectData: userData
+		}, req.user);
 	}).then(function (creationResult) {
 		// User created, we can generate the session token
 		result = extend({}, creationResult, {
@@ -302,15 +391,20 @@ app.post('/1/users', function(req, res) { // Signing up, linking users
 		});
 
 		// Set the user's session token
-		return api.updateObject('_User', result.objectId, {
-			sessionToken: result.sessionToken
-		});
+		return api.updateObject({
+			className: '_User',
+			objectId: result.objectId,
+			objectData: {
+				sessionToken: result.sessionToken
+			}
+		}, req.user);
 	}).then(function () {
 		res
 		//.location('/1/users/'+result.objectId)
 		.send(201, result);
+	}, function (err) {
+		return api.rejected(err, res);
 	});
-	api.catch(res, promise);
 });
 app.put('/1/users/:objectId', function(req, res) { // Updating Users, Linking Users, Verifying Emails
 	var objectId = req.param('objectId'),
@@ -318,22 +412,27 @@ app.put('/1/users/:objectId', function(req, res) { // Updating Users, Linking Us
 
 	// TODO: ACL
 	if (!req.user || req.user.id !== objectId) {
-		api.catch(res, Q.reject(new ApiError('unauthorized', 401)));
+		api.catch(res, Q.reject(ApiError.unauthorized()));
 		return;
 	}
 
 	function updateUser(userData) {
-		return api.call('updateObject', ['_User', objectId, userData], res);
+		return api.call('updateObject', [{
+			className: '_User',
+			objectId: objectId,
+			objectData: userData
+		}, req.user], res);
 	}
 
 	if (userData.password) { // Password changed? Hash it!
-		var promise = hasher.hash(userData.password).then(function (hash) {
+		hasher.hash(userData.password).then(function (hash) {
 			userData.password = hash;
 
 			// Then, update the user
 			updateUser(userData);
+		}, function (err) {
+			return api.rejected(err, res);
 		});
-		api.catch(res, promise);
 	} else {
 		updateUser(userData);
 	}
@@ -348,11 +447,13 @@ app.delete('/1/users/:objectId', function(req, res) { // Deleting users
 
 	// TODO: ACL
 	if (!req.user || req.user.id !== objectId) {
-		api.catch(res, Q.reject(new ApiError('unauthorized', 401)));
-		return;
+		return api.rejected(ApiError.unauthorized(), res);
 	}
 
-	api.call('deleteObject', ['_User', objectId], res);
+	api.call('deleteObject', [{
+		className: '_User',
+		objectId: objectId
+	}, req.user], res);
 });
 
 // Roles
