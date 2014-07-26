@@ -12,7 +12,9 @@ var builtInTypes = {
 	'Date': Date,
 
 	'Mixed': Schema.Types.Mixed,
-	'ObjectId': Schema.Types.ObjectId
+	'ObjectId': Schema.Types.ObjectId,
+
+	'Pointer': Schema.Types.Mixed
 };
 function parseType(type) {
 	if (typeof type == 'function') { // Already a type
