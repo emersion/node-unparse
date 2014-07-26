@@ -24,6 +24,9 @@ function ApiError(msg, code) {
 ApiError.unauthorized = function () {
 	return new ApiError('unauthorized', 401);
 };
+ApiError.notFound = function () {
+	return new ApiError('object not found', 404);
+};
 
 /**
  * Generate a session token.
@@ -42,12 +45,24 @@ api.rejected = function (err, res) {
 	var code = 400,
 		msg = err;
 
-	if (err && err instanceof ApiError) {
-		code = err.code;
-		msg = err.message;
-	}
+	if (err) {
+		if (err instanceof ApiError) {
+			code = err.code;
+			msg = err.message;
+		} else if (err instanceof Error) {
+			msg = err.name + ': ' +err.message;
 
-	res.send(code, { error: msg });
+			console.warn(err);
+			console.warn(err.stack);
+		}
+	} else {
+		msg = 'unknown error';
+
+		console.warn('Unknown error');
+		console.trace();
+	}
+//console.warn(err);
+	res.status(code).send({ error: String(msg) });
 };
 api.catch = function (promise, res) {
 	return promise.catch(function (err) {
@@ -69,19 +84,49 @@ api.call = function (method, args, res) {
 // ACLs
 api.acl = {};
 api.acl.defaults = function (object) {
+	// TODO: defaults based on classes ACLs?
 	return {
 		'*': { read: true }
 	};
 };
+api.acl.classDefaults = function (classObj) {
+	return {
+		'*': {
+			// ACLs for the class row (in __Class)
+			read: true,
+			write: true,
+
+			// ACLs for items in the class
+			get: true,
+			find: true,
+			update: true,
+			create: true,
+			'delete': true
+		}
+	};
+};
 api.acl.get = function (object) {
+	if (object.ACL) {
+		return object.ACL;
+	} else {
+		if (object.constructor.modelName == '__Class') {
+			return this.classDefaults(object);
+		} else {
+			return this.defaults(object);
+		}
+	}
+
 	return object.ACL || this.defaults(object);
 };
 api.acl.verify = function (object, user, operation) {
 	var acl = this.get(object),
-		userId = user.id();
+		userGroups = [];
 
+	if (user) {
+		userGroups.push(user._id);
+	}
 	// TODO: roles support: "role:Members":{"write":true}
-	var userGroups = [userId, '*'];
+	userGroups.push('*');
 
 	// The order of groups is important (more specific -> more general)
 	for (var i = 0; i < userGroups.length; i++) {
@@ -107,48 +152,76 @@ api.acl.try = function (object, user, operation, previous) { // read, write
 
 	return promise;
 };
-api.acl.tryForClass = function (className, user, operation) { // get, find, update. create, delete (and add fields?)
-	//TODO
+api.acl.tryForClass = function (className, user, operation, previous) { // get, find, update. insert, delete
+	return db.queryOne('__Class', { where: { name: className } }).then(function (classObj) {
+		return api.acl.try(classObj, user, operation, previous);
+	});
 };
 
 // API functions, with ACL checks
-// TODO: check classes ACLs
 api.queryObjects = function (params, user) {
-	return db.queryObjects(params.className, params.options).then(function (data) {
+	// Check class ACL
+	return api.acl.tryForClass(params.className, user, 'query').then(function () {
+		// Execute the query
+		return db.queryObjects(params.className, params.options);
+	}).then(function (data) {
 		// Serialize objects
+		var results = [];
 		for (var i = 0; i < data.results.length; i++) {
 			var obj = data.results[i];
 
-			// Check ACL
+			// Check each object's ACL
 			if (!api.acl.verify(obj, user, 'read')) {
 				continue;
 			}
 
-			data.results[i] = serializer.serialize();
+			results.push(serializer.serialize(obj));
 		}
+		data.results = results;
 
 		return data;
 	});
 };
 api.retrieveObject = function (params, user) {
-	return db.retrieveObject(params.className, params.objectId).then(function (object) {
+	// Check class ACL
+	return api.acl.tryForClass(params.className, user, 'get').then(function () {
+		// Retrieve the object
+		return db.retrieveObject(params.className, params.objectId);
+	}).then(function (object) {
+		// Check the object's ACL
 		return api.acl.try(object, user, 'read');
 	}).then(function (object) {
+		if (!object) {
+			throw ApiError.notFound();
+		}
+
+		// Serialize the result
 		return serializer.serialize(object);
 	});
 };
 api.insertObject = function (params, user) {
-	return db.insertObject(params.className, params.objectData).then(function (object) {
+	// Check class ACL
+	return api.acl.tryForClass(params.className, user, 'insert').then(function () {
+		// Insert the new object
+		return db.insertObject(params.className, params.objectData);
+	}).then(function (object) {
 		return {
 			createdAt: object.createdAt,
-			objectId: object.id()
+			objectId: object._id
 		};
 	});
 };
 api.updateObject = function (params, user) {
-	return db.retrieveObject(params.className, params.objectId).then(function (object) {
+	// Check class ACL
+	return api.acl.tryForClass(params.className, user, 'update').then(function () {
+		// Retrieve the object
+		return db.retrieveObject(params.className, params.objectId);
+	}).then(function (object) {
+		// Check the object's ACL
 		return api.acl.try(object, user, 'write');
 	}).then(function (object) {
+		// Update the object
+		// TODO: use object.save() instead?
 		return db.updateObject(params.className, params.objectId, params.objectData);
 	}).then(function (object) {
 		return {
@@ -157,9 +230,15 @@ api.updateObject = function (params, user) {
 	});
 };
 api.deleteObject = function (params, user) {
-	return db.retrieveObject(params.className, params.objectId).then(function (obj) {
+	// Check class ACL
+	return api.acl.tryForClass(params.className, user, 'delete').then(function () {
+		// Retrieve the object
+		return db.retrieveObject(params.className, params.objectId);
+	}).then(function (obj) {
+		// Check the object's ACL
 		return api.acl.try(obj, user, 'write');
 	}).then(function (obj) {
+		// Delete the object
 		return db.deleteObject(params.className, params.objectId);
 	}).then(function () {
 		return; // Return nothing
@@ -291,7 +370,7 @@ app.get('/1/login', function(req, res) { // Logging in
 	db.model('_User').findOne({
 		username: username
 	}, function (err, user) {
-		if (err) {
+		if (err || !user) {
 			return api.rejected(invalidCredentials(), res);
 		}
 
@@ -400,8 +479,9 @@ app.post('/1/users', function(req, res) { // Signing up, linking users
 		}, req.user);
 	}).then(function () {
 		res
-		//.location('/1/users/'+result.objectId)
-		.send(201, result);
+		.status(201)
+		.location('/1/users/'+result.objectId)
+		.send(result);
 	}, function (err) {
 		return api.rejected(err, res);
 	});

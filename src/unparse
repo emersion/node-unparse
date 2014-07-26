@@ -26,20 +26,58 @@ var opt = require('node-getopt').create([
 
 switch (opt.argv[0]) {
 	case 'init':
-		// Init the database
+		// Initialize unparse
+		var crypto = require('crypto');
+		var configCtrl = require('./config');
 		var db = require('./lib/db');
 
-		db.connect().then(function () {
-			process.stdout.write('Populating database with default classes...\n');
-			return db.init();
+		/**
+		 * Generate a key.
+		 * @return {String} The generated key.
+		 */
+		function generateKey() {
+			var sha = crypto.createHash('sha1');
+			sha.update(Math.random().toString());
+			return sha.digest('hex');
+		}
+
+		// Generate app ID and keys if empty
+		configCtrl.read().then(function (config) {
+			if (!config.appId) {
+				config.appId = generateKey();
+				process.stdout.write('App ID generated: '+config.appId+'\n');
+			}
+
+			var keysNames = ['javascriptKey', 'restKey'];
+			for (var i = 0; i < keysNames.length; i++) {
+				var keyName = keysNames[i],
+					keyValue = config[keyName];
+
+				if (!keyValue) {
+					keyValue = generateKey();
+					config[keyName] = keyValue;
+
+					process.stdout.write(keyName+' generated: '+keyValue+'\n');
+				}
+			}
+
+			return configCtrl.write(config);
 		}).then(function () {
-			process.stdout.write('Database populated with default classes.\n');
-			process.exit(0);
-		}, function (err) {
-			process.stderr.write('Failed to populate the database.\n');
-			console.log(err);
-			process.exit(1);
+			// Populate the database with default classes
+			process.stdout.write('Connecting to the database...\n');
+			return db.connect().then(function () {
+				process.stdout.write('Populating database with default classes...\n');
+				return db.init();
+			}).then(function () {
+				process.stdout.write('Database populated with default classes.\n');
+				process.exit(0);
+			}, function (err) {
+				process.stderr.write('Failed to populate the database.\n');
+				console.log(err);
+				process.exit(1);
+			});
 		});
+
 		return;
 	case 'server':
 	default:

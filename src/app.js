@@ -6,7 +6,7 @@ var errorhandler = require('errorhandler');
 //var cookieParser = require('cookie-parser');
 var session = require('cookie-session');
 
-var config = require('./config');
+var configCtrl = require('./config');
 var api = require('./lib/api');
 var app = module.exports = express();
 
@@ -14,7 +14,7 @@ app.set('port', process.env.PORT || 3000);
 //app.use(express.logger('dev'));
 app.use(bodyParser.json());
 //app.use(cookieParser());
-app.use(session(config.session));
+//app.use(session(config.session));
 //app.use(express.compress());
 app.use(methodOverride(function(req, res) {
 	if (req.body && typeof req.body === 'object' && '_method' in req.body) {
@@ -79,20 +79,24 @@ app.use(function (req, res, next) { // App authentication
 	}
 
 	// Check API credentials
-	var authenticated = false;
-	if (config.appId == appAuth.appId) {
-		if (config.javascriptKey == appAuth.javascriptKey) {
-			authenticated = true;
-		} else if (config.restKey == appAuth.restKey) {
-			authenticated = true;
+	configCtrl.read().then(function (config) {
+		var authenticated = false;
+		if (config.appId == appAuth.appId) {
+			if (config.javascriptKey == appAuth.javascriptKey) {
+				authenticated = true;
+			} else if (config.restKey == appAuth.restKey) {
+				authenticated = true;
+			}
 		}
-	}
 
-	if (authenticated) { // No problem
-		next();
-	} else { // Access denied
-		res.send(401, { error: 'unauthorized' });
-	}
+		if (authenticated) { // No problem
+			next();
+		} else { // Access denied
+			res.send(401, { error: 'unauthorized' });
+		}
+	}, function () {
+		res.send(500, { error: 'unable to read config file' });
+	});
 });
 app.use(api);
 
