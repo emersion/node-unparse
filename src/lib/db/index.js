@@ -1,4 +1,4 @@
-var mongoose = require('mongoose');
+var Waterline = require('waterline');
 var Q = require('q');
 var EventEmitter = require('events').EventEmitter;
 var extend = require('extend');
@@ -6,50 +6,113 @@ var extend = require('extend');
 var models = require('./models');
 var configCtrl = require('../../config');
 
+var controller = new EventEmitter();
+
+var orm;
+var connections, collections;
+
 function isClass(className) {
-	return !!models[className];
+	return !!controller.model(className);
 }
 function ensureClassExists(className) {
 	if (!isClass(className)) {
-		return Q.reject({
-			error: 'class not found: '+className
-		});
+		return Q.reject('class not found: '+className);
 	}
 	return Q();
 }
 
-var controller = new EventEmitter();
-
-controller.connect = function () {
+function getConfig() {
 	return configCtrl.read().then(function (config) {
+		return {
+			// Setup Adapters
+			// Creates named adapters that have have been required
+			adapters: {
+				'default': 'mongo',
+				disk: require('sails-disk'),
+				mongo: require('sails-mongo')
+			},
+
+			// Build Connections Config
+			// Setup connections using the named adapter configs
+			connections: {
+				'default': config.connection
+			}
+		};
+	});
+}
+function initialize() {
+	return getConfig().then(function (config) {
+		// Start Waterline passing adapters in
 		var deferred = Q.defer();
+		orm.initialize(config, function(err, data) {
+			if (err) {
+				deferred.reject(err);
+				return;
+			}
 
-		mongoose.connect(config.database.uri);
+			connections = data.connections;
+			collections = data.collections;
 
-		var db = mongoose.connection;
-		db.on('error', console.error.bind(console, 'connection error:'));
-		db.once('open', function () {
-			console.log('Connected to the database');
-			models.loadBaseModels();
-
-			models.__Class.find(function (err, classes) {
-				models.loadAllModels(classes);
-
-				controller.emit('open');
-				deferred.resolve();
-			});
+			deferred.resolve();
 		});
-		db.on('disconnected', function () {
-			console.log('Connection to database closed.');
-			process.exit(1);
-		});
-
 		return deferred.promise;
 	});
+}
+function teardown() {
+	var deferred = Q.defer();
+	orm.teardown(function () {
+		deferred.resolve();
+	});
+	return deferred.promise;
+}
+function reload() {
+	var promise = teardown().then(function () {
+		return initialize();
+	});
+	this.connecting = promise;
+	return promise;
+}
+
+function loadAllModels(classes) {
+	return Q.try(function () {
+		models.loadAllModels(orm, classes);
+	}).then(function () {
+		console.log('Reloading database connections after models update');
+		return reload();
+	});
+}
+function loadModel(classData) {
+	return loadAllModels([classData]);
+}
+function unloadModel(className) {
+	models.unloadModel(className);
+
+	delete orm.collections[className.toLowerCase()];
+}
+
+controller.connect = function () {
+	var that = this;
+
+	orm = new Waterline();
+	models.loadBaseModels(orm);
+
+	var promise = initialize().then(function () {
+		// Load stored models
+		return that.model('__Class').find().then(function (classes) {
+			return loadAllModels(classes);
+		}, function (err) {
+			throw 'Cannot load classes from database: '+err;
+		});
+	}).then(function () {
+		// Database opened!
+		controller.emit('open');
+	});
+	this.connecting = promise;
+	return promise;
 };
 
 controller.model = function (className) {
-	return models[className];
+	return collections[String(className).toLowerCase()];
 };
 
 controller.retrieveObject = function (className, objectId) {
@@ -60,9 +123,7 @@ controller.retrieveObject = function (className, objectId) {
 
 		that.model(className).findById(objectId, function (err, object) {
 			if (err) {
-				deferred.reject({
-					error: 'cannot retrieve object: '+err
-				});
+				deferred.reject('cannot retrieve object: '+err);
 			} else {
 				deferred.resolve(object);
 			}
@@ -221,87 +282,54 @@ controller.insertObject = function (className, objectData) {
 	var that = this;
 
 	return ensureClassExists(className).then(function () {
-		var deferred = Q.defer();
-
-		// If we're inserting a new class, check that we can load the corresponding model
-		if (className == '__Class') {
-			try {
-				models.loadModel(objectData);
-			} catch (e) {
-				deferred.reject({
-					error: e.getMessage()
-				});
-				return deferred.promise;
+		return that.model(className).create(objectData).then(function (object) {
+			// If we're inserting a new class
+			if (className == '__Class') {
+				return loadModel(object).catch(function (err) {
+					return object.destroy().thenReject(err);
+				}).thenResolve(object);
 			}
-		}
-
-		var object = new that.model(className)(objectData);
-
-		object.save(function (err, object) {
-			if (err) {
-				// The class was not created as expected, unload the model
-				models.unloadModel(objectData.name);
-
-				deferred.reject({
-					error: 'cannot insert object: '+err
-				});
-			} else {
-				deferred.resolve(object);
-			}
+			return object;
 		});
-
-		return deferred.promise;
 	});
 };
 
+/**
+ * @see https://github.com/balderdashy/sails/blob/master/lib/hooks/blueprints/actions/update.js
+ */
 controller.updateObject = function (className, objectId, objectData) {
 	var that = this;
 
 	return ensureClassExists(className).then(function () {
-		var deferred = Q.defer();
-
-		that.model(className).findByIdAndUpdate(objectId, objectData, function (err, object) {
-			if (err) {
-				deferred.reject({
-					error: 'cannot update object: '+err
-				});
-			} else {
-				// Unload and reload the class when updated
-				if (className == '__Class') {
-					models.unloadModel(object.name);
-					models.loadModel(object);
-				}
-
-				deferred.resolve(object);
-			}
+		return that.model(className).update(objectId, objectData).then(function (objects) {
+			return objects[0];
 		});
-
-		return deferred.promise;
+	}).then(function (object) {
+		// Unload and reload the class when updated
+		if (className == '__Class') {
+			unloadModel(object.name);
+			return loadModel(object).thenResolve(object);
+		}
+		return object;
 	});
 };
 
+/**
+ * @see https://github.com/balderdashy/sails/blob/master/lib/hooks/blueprints/actions/remove.js
+ */
 controller.deleteObject = function (className, objectId) {
-	var that = this;
+	var that = this,
+		model = that.model(className);
 
 	return ensureClassExists(className).then(function () {
-		var deferred = Q.defer();
-
-		that.model(className).findByIdAndRemove(objectId, function (err, object) {
-			if (err) {
-				deferred.reject({
-					error: 'cannot delete object: '+err
-				});
-			} else {
-				// Unload the class when deleted
-				if (className == '__Class') {
-					models.unloadModel(object.name);
-				}
-
-				deferred.resolve();
-			}
-		});
-
-		return deferred.promise;
+		return model.findOne(objectId);
+	}).then(function (object) {
+		return that.model(className).destroy(objectId).then().thenResolve(object);
+	}).then(function (object) {
+		// Unload the class when deleted
+		if (className == '__Class') {
+			unloadModel(object.name);
+		}
 	});
 };
 
@@ -311,36 +339,46 @@ controller.init = function () {
 	// Default classes
 	var classes = [{
 		name: '_User',
-		fields: [{
-			name: 'username',
-			type: 'String',
-			unique: true
-		}, {
-			name: 'password',
-			type: 'String'
-		}, {
-			name: 'email',
-			type: 'String',
-			unique: true
-		}, {
-			name: 'sessionToken',
-			type: 'String'
-		}, {
-			name: 'authData',
-			type: 'Object'
-		}]
+		attributes: {
+			username: {
+				type: 'string',
+				required: true,
+				unique: true
+			},
+			password: {
+				type: 'string',
+				'protected': true
+			},
+			email: {
+				type: 'email',
+				unique: true
+			},
+			sessionToken: {
+				type: 'string',
+				'protected': true
+			},
+			authData:  {
+				type: 'json',
+				'protected': true
+			}/*,
+			roles: {
+				collection: '_Role',
+				via: 'users'
+			}*/
+		}
 	}/*, {
 		name: '_Role',
-		fields: [{
-			name: 'name',
-			type: 'String'
-		}, {
-			name: 'roles',
-			type: '[Relation<_Role>]'
-		}, {
-			name: 'users',
-			type: '[Relation<_User>]'
-		}]
+		attributes: {
+			name: 'string',
+			roles: {
+				collection: '_Role'
+			},
+			users: {
+				collection: '_User',
+				via: 'roles',
+				dominant: true
+			}
+		}
 	}*/];
 
 	var promises = [];
@@ -349,7 +387,10 @@ controller.init = function () {
 
 		// The class will be automatically loaded when inserting it
 		var promise = this.insertObject('__Class', classData).catch(function (err) {
-			models.unloadModel(classData.name);
+			if (models.isModelLoaded(classData.name)) {
+				models.unloadModel(classData.name);
+			}
+			throw err;
 		});
 		promises.push(promise);
 	}

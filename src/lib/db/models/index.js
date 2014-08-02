@@ -1,51 +1,17 @@
-var mongoose = require('mongoose');
-var Schema = mongoose.Schema;
+var Waterline = require('waterline');
+var Q = require('q');
 
 module.exports = {};
-module.exports.schemas = {};
+module.exports.collections = {};
 
-var builtInTypes = {
-	'String': String,
-	'Number': Number,
-	'Boolean': Boolean,
-	'Array': Array,
-	'Date': Date,
-
-	'Mixed': Schema.Types.Mixed,
-	'ObjectId': Schema.Types.ObjectId,
-
-	'Pointer': Schema.Types.Mixed
-};
-function parseType(type) {
-	if (typeof type == 'function') { // Already a type
-		return type;
-	} else if (typeof type == 'string') {
-		return builtInTypes[type] || type;
-	} else if (type instanceof Array) {
-		var parsedType = [];
-		for (var i = 0; i < type.length; i++) {
-			parsedType.push(parseType(type[i]));
-		}
-		return parsedType;
-	} else if (typeof type == 'object') {
-		var parsedType = {};
-		for (var i in type) {
-			parsedType[i] = parseType(type[i]);
-		}
-		return parsedType;
-	}
-
-	return type;
-}
-
-module.exports.loadModel = function (classData, methods) {
+module.exports.loadModel = function (orm, classData) {
 	var name = classData.name,
-		fields = classData.fields;
+		attributes = classData.attributes;
 
 	if (!name) {
 		throw new Error('invalid model: no name specified');
 	}
-	if (this[name]) {
+	if (this.isModelLoaded(name)) {
 		console.warn('Cannot load model '+name+': already loaded');
 		throw new Error('invalid model '+name+': already loaded');
 	}
@@ -53,80 +19,110 @@ module.exports.loadModel = function (classData, methods) {
 	console.log('Loading model '+name);
 
 	var def = {
-		createdAt: Date,
-		updatedAt: Date,
-		ACL: Object
+		identity: String(name),
+		connection: 'default',
+		autoCreatedAt: true,
+		autoUpdatedAt: true,
+		autoPK: true,
+		types: {
+			/*ACL: function (acl) {
+
+			}*/
+		},
+		attributes: {
+			ACL: 'json',
+			toJSON: function () {
+				
+			}
+		}
 	};
 
-	// TODO: schema as an Object
-	for (var i = 0; i < fields.length; i++) {
-		var field = fields[i];
+	var protectedAttrs = [];
+	for (var attrName in attributes) {
+		var attr = attributes[attrName];
 
-		if (def[field.name]) { // Do not override default fields
+		if (def.attributes[attrName]) { // Do not override default fields
 			continue;
 		}
 
-		def[field.name] = {
-			type: parseType(field.type),
-			unique: (field.unique) ? true : false,
-			required: (field.required) ? true : false,
-			ref: field.ref //TODO: https://www.parse.com/docs/rest#queries
-		};
-	}
-
-	var schema = new Schema(def);
-	schema.pre('save', function (next) {
-		if (!this.createdAt) {
-			this.createdAt = new Date();
+		if (typeof attr == 'string') {
+			attr = {
+				type: attr
+			};
 		}
 
-		this.updatedAt = new Date();
+		if (attr.protected) {
+			protectedAttrs.push(attrName);
+		}
 
-		next();
-	});
-
-	if (methods) {
-		schema.method(methods);
+		def.attributes[attrName] = attr;
 	}
-	
-	var model = mongoose.model(name, schema);
 
-	this.schemas[name] = schema;
-	this[name] = model;
+	def.attributes.toJSON = function () {
+		var data;
+		if (typeof attributes.toJSON == 'function') {
+			data = attributes.toJSON.apply(this, arguments);
+		} else {
+			data = this.toObject();
+
+			// If any of the attributes are protected, we should remove them
+			if (protectedAttrs.length) {
+				for (var i = 0; i < protectedAttrs.length; i++) {
+					var attrName = protectedAttrs[i];
+
+					if (typeof data[attrName] !== 'undefined') {
+						delete data[attrName];
+					}
+				}
+			}
+		}
+
+		if (data.id) {
+			data.objectId = data.id;
+			delete data.id;
+		}
+
+		return data;
+	};
+
+	var collection = Waterline.Collection.extend(def);
+	orm.loadCollection(collection);
+	this.collections[name] = collection;
 };
 
 module.exports.unloadModel = function (name) {
-	if (!this[name]) {
+	if (!this.isModelLoaded(name)) {
 		console.warn('Cannot unload model '+name+': not loaded');
 		return;
 	}
 
-	delete this.schemas[name];
+	delete this.collections[name];
 	delete this[name];
 };
 
-module.exports.loadBaseModels = function () {
-	this.loadModel({
+module.exports.isModelLoaded = function (name) {
+	return !!this.collections[name];
+};
+
+module.exports.loadBaseModels = function (orm) {
+	this.loadModel(orm, {
 		name: '__Class',
-		fields: [{
-			name: 'name',
-			type: String
-		}, {
-			name: 'fields',
-			type: [{ name: String, type: { type: String } }]
-		}, {
-			name: 'ACL',
-			type: Object
-		}]
+		attributes: {
+			name: {
+				type: 'string',
+				required: true
+			},
+			attributes: 'json'
+		}
 	});
 };
 
-module.exports.loadAllModels = function (classes) {
+module.exports.loadAllModels = function (orm, classes) {
 	for (var i = 0; i < classes.length; i++) {
 		var classData = classes[i];
 
 		try {
-			this.loadModel(classData);
+			this.loadModel(orm, classData);
 		} catch (e) {
 			console.warn('Cannot load stored class '+classData.name, e);
 		}

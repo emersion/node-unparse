@@ -1,12 +1,16 @@
 {
-	"database": {
-		"uri": "mongodb://localhost/unparse"
-	},
-	"appId": "",
-	"javascriptKey": "",
-	"restKey": "",
-	"session": {
-		"name": "unparse",
-		"keys": ["change", "this"]
-	}
+  "connection": {
+    "adapter": "mongo",
+    "url": "mongodb://localhost:27017/unparse"
+  },
+  "appId": "",
+  "javascriptKey": "",
+  "restKey": "",
+  "session": {
+    "name": "unparse",
+    "keys": [
+      "change",
+      "this"
+    ]
+  }
 }
