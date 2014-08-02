@@ -92,10 +92,10 @@ app.use(function (req, res, next) { // App authentication
 		if (authenticated) { // No problem
 			next();
 		} else { // Access denied
-			res.send(401, { error: 'unauthorized' });
+			res.status(401).send({ error: 'unauthorized' });
 		}
 	}, function () {
-		res.send(500, { error: 'unable to read config file' });
+		res.status(500).send({ error: 'unable to read config file' });
 	});
 });
 app.use(api);
@@ -106,5 +106,5 @@ if ('development' === app.get('env')) {
 }
 app.use(function(err, req, res, next){
 	console.error(err.stack);
-	res.send(500, 'Something broke!');
+	res.status(500).send('Something broke!');
 });

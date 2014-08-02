@@ -73,7 +73,10 @@ switch (opt.argv[0]) {
 				process.exit(0);
 			}, function (err) {
 				process.stderr.write('Failed to populate the database.\n');
-				console.log(err);
+				console.error(err);
+				if (err.stack) {
+					console.error(err.stack);
+				}
 				process.exit(1);
 			});
 		});

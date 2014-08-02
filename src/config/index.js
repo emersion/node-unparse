@@ -27,7 +27,7 @@ controller.write = function (newConfig) {
 	return this.read().then(function (currentConfig) {
 		extend(currentConfig, newConfig);
 
-		var json = JSON.stringify(currentConfig);
+		var json = JSON.stringify(currentConfig, null, 2);
 
 		return Q.Promise(function(resolve, reject, notify) {
 			fs.writeFile(configFile, json, function (err) {

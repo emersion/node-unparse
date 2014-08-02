@@ -7,7 +7,6 @@ var Q = require('q');
 
 var path = require('path');
 var db = require('../db');
-var serializer = require('./serializer');
 var hasher = require('../hasher');
 
 /**
@@ -26,6 +25,9 @@ ApiError.unauthorized = function () {
 };
 ApiError.notFound = function () {
 	return new ApiError('object not found', 404);
+};
+ApiError.notImplemented = function () {
+	return new ApiError('not implemented', 501);
 };
 
 /**
@@ -63,6 +65,9 @@ api.rejected = function (err, res) {
 	}
 //console.warn(err);
 	res.status(code).send({ error: String(msg) });
+};
+api.notImplemented = function (res) {
+	return api.rejected(ApiError.notImplemented(), res);
 };
 api.catch = function (promise, res) {
 	return promise.catch(function (err) {
@@ -175,7 +180,7 @@ api.queryObjects = function (params, user) {
 				continue;
 			}
 
-			results.push(serializer.serialize(obj));
+			results.push(obj.toJSON());
 		}
 		data.results = results;
 
@@ -196,7 +201,7 @@ api.retrieveObject = function (params, user) {
 		}
 
 		// Serialize the result
-		return serializer.serialize(object);
+		return object.toJSON();
 	});
 };
 api.insertObject = function (params, user) {
@@ -207,7 +212,7 @@ api.insertObject = function (params, user) {
 	}).then(function (object) {
 		return {
 			createdAt: object.createdAt,
-			objectId: object._id
+			objectId: object.id
 		};
 	});
 };
@@ -246,18 +251,22 @@ api.deleteObject = function (params, user) {
 };
 
 // Connect to the database
-var dbOpening = db.connect().then(function () {
-	console.log('Database opened.');
+db.connect().then(function () {
+	console.log('Database connected.');
 }, function (err) {
-	console.warn('Cannot connect to database', err);
+	console.error('Cannot connect to database: ', err);
+	if (err.stack) {
+		console.error(err.stack);
+	}
+	process.exit(1);
 });
 // Wait for the database before answering requests
 app.use(function(req, res, next) {
-	if (dbOpening.isPending()) { // Database not ready
-		dbOpening.then(function () {
+	if (db.connecting.isPending()) { // Database not ready
+		db.connecting.then(function () {
 			next();
 		}, function () { // Database connect error
-			res.send(500, 'Cannot connect to database');
+			res.status(500).send('Cannot connect to database');
 		});
 	} else {
 		next();
@@ -386,7 +395,7 @@ app.get('/1/login', function(req, res) { // Logging in
 
 			// TODO: set session cookie (only if using Javascript SDK?)
 
-			var result = serializer.serialize(user);
+			var result = user.toJSON();
 			if (user.sessionToken) { // Session token already generated
 				result.sessionToken = user.sessionToken;
 				return result;
@@ -415,13 +424,13 @@ app.get('/1/users/me', function(req, res) { // Validating Session Tokens, Retrie
 		return api.rejected(new ApiError('invalid session', 403), res);
 	}
 
-	res.send(serializer.serialize(req.user));
+	res.send(req.user.toJSON());
 });
 app.get('/1/users/:objectId', function(req, res) { // Retrieving users
 	var objectId = req.param('objectId');
 
 	var promise = db.retrieveObject('_User', objectId).then(function (object) {
-		return serializer.serialize(object);
+		return object.toJSON();
 	});
 	api.when(promise, res);
 });
@@ -520,7 +529,7 @@ app.put('/1/users/:objectId', function(req, res) { // Updating Users, Linking Us
 app.post('/1/requestPasswordReset', function(req, res) { // Requesting a password reset
 	var email = req.param('email');
 
-	res.send(501, { error: 'not implemented' });
+	api.notImplemented(res);
 });
 app.delete('/1/users/:objectId', function(req, res) { // Deleting users
 	var objectId = req.param('objectId');
@@ -539,38 +548,37 @@ app.delete('/1/users/:objectId', function(req, res) { // Deleting users
 // Roles
 // @see https://www.parse.com/docs/rest#roles
 app.get('/1/roles', function(req, res) { // Querying roles
-	res.send(501, { error: 'not implemented' });
+	api.notImplemented(res);
 });
 app.post('/1/roles', function(req, res) { // Creating roles
-	res.send(501, { error: 'not implemented' });
+	api.notImplemented(res);
 });
 app.get('/1/roles/:objectId', function(req, res) { // Retrieving roles
 	var objectId = req.param('objectId');
 
-	res.send(501, { error: 'not implemented' });
+	api.notImplemented(res);
 });
 app.put('/1/roles/:objectId', function(req, res) { // Updating roles
 	var objectId = req.param('objectId');
 
-	res.send(501, { error: 'not implemented' });
+	api.notImplemented(res);
 });
 app.delete('/1/roles/:objectId', function(req, res) { // Deleting roles
 	var objectId = req.param('objectId');
 
-	res.send(501, { error: 'not implemented' });
+	api.notImplemented(res);
 });
 
 // Files
 // @see https://www.parse.com/docs/rest#files
-app.post('/1/files/:fileName', function(req, res) {
-	// Uploading Files
-	res.send(501, { error: 'not implemented' });
+app.post('/1/files/:fileName', function(req, res) { // Uploading Files
+	api.notImplemented(res);
 });
 
 // Cloud functions
 app.post('/1/functions/:functionName', function(req, res) { // Call a cloud function
-	res.send(501, { error: 'not implemented' });
+	api.notImplemented(res);
 });
 app.post('/1/jobs/:jobName', function(req, res) { // Start a background job
-	res.send(501, { error: 'not implemented' });
+	api.notImplemented(res);
 });
