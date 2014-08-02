@@ -1,6 +1,7 @@
 {
-  "database": {
-    "uri": "mongodb://localhost/unparse"
+  "connection": {
+    "adapter": "mongo",
+    "url": "mongodb://localhost:27017/unparse"
   },
   "appId": "",
   "javascriptKey": "",

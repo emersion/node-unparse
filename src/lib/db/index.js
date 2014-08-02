@@ -12,28 +12,6 @@ var CollectionLoader = require('waterline/lib/waterline/collection/loader');
 
 var controller = new EventEmitter();
 
-var config = {
-	// Setup Adapters
-	// Creates named adapters that have have been required
-	adapters: {
-		'default': 'mongo',
-		disk: require('sails-disk'),
-		mongo: require('sails-mongo')
-	},
-
-	// Build Connections Config
-	// Setup connections using the named adapter configs
-	connections: {
-		'default': {
-			adapter: 'mongo',
-			url: 'mongodb://localhost:27017/unparse'
-		},
-		localDisk: {
-			adapter: 'disk'
-		}
-	}
-};
-
 var orm;
 var connections, collections;
 
@@ -47,21 +25,42 @@ function ensureClassExists(className) {
 	return Q();
 }
 
-function initialize() {
-	// Start Waterline passing adapters in
-	var deferred = Q.defer();
-	orm.initialize(config, function(err, data) {
-		if (err) {
-			deferred.reject(err);
-			return;
-		}
+function getConfig() {
+	return configCtrl.read().then(function (config) {
+		return {
+			// Setup Adapters
+			// Creates named adapters that have have been required
+			adapters: {
+				'default': 'mongo',
+				disk: require('sails-disk'),
+				mongo: require('sails-mongo')
+			},
 
-		connections = data.connections;
-		collections = data.collections;
-
-		deferred.resolve();
+			// Build Connections Config
+			// Setup connections using the named adapter configs
+			connections: {
+				'default': config.connection
+			}
+		};
 	});
-	return deferred.promise;
+}
+function initialize() {
+	return getConfig().then(function (config) {
+		// Start Waterline passing adapters in
+		var deferred = Q.defer();
+		orm.initialize(config, function(err, data) {
+			if (err) {
+				deferred.reject(err);
+				return;
+			}
+
+			connections = data.connections;
+			collections = data.collections;
+
+			deferred.resolve();
+		});
+		return deferred.promise;
+	});
 }
 function teardown() {
 	var deferred = Q.defer();
