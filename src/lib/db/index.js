@@ -6,10 +6,6 @@ var extend = require('extend');
 var models = require('./models');
 var configCtrl = require('../../config');
 
-var _ = require('lodash');
-var Schema = require('waterline-schema');
-var CollectionLoader = require('waterline/lib/waterline/collection/loader');
-
 var controller = new EventEmitter();
 
 var orm;
