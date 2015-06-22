@@ -4,7 +4,8 @@
   "description": "An open-source clone of Parse.",
   "main": "index.js",
   "scripts": {
-    "test": "grunt test"
+    "test": "grunt test",
+    "start": "src/unparse"
   },
   "repository": {
     "type": "git",
@@ -37,6 +38,7 @@
     "node-getopt": "^0.2.3",
     "q": "^1.0.1",
     "sails-disk": "^0.10.3",
+    "sails-memory": "^0.10.5",
     "sails-mongo": "^0.10.1",
     "waterline": "^0.10.1"
   }

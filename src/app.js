@@ -13,10 +13,13 @@ var app = module.exports = express();
 app.set('port', process.env.PORT || 3000);
 //app.use(express.logger('dev'));
 app.use(bodyParser.json());
+app.use(bodyParser.json({
+	type: 'text/plain' // Parse JS SDK is not setting request Content-Type to "application/json"
+}));
 //app.use(cookieParser());
 //app.use(session(config.session));
 //app.use(express.compress());
-app.use(methodOverride(function(req, res) {
+app.use(methodOverride(function (req, res) {
 	if (req.body && typeof req.body === 'object' && '_method' in req.body) {
 		var method = req.body._method;
 		delete req.body._method;
@@ -71,9 +74,11 @@ app.use(function (req, res, next) { // App authentication
 		// Authentication with request body fields
 		if (req.body._ApplicationId) {
 			appAuth.appId = req.body._ApplicationId;
+			delete req.body._ApplicationId;
 
 			if (req.body._JavaScriptKey) {
 				appAuth.javascriptKey = req.body._JavaScriptKey;
+				delete req.body._JavaScriptKey;
 			}
 		}
 	}

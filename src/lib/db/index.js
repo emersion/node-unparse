@@ -29,6 +29,7 @@ function getConfig() {
 			adapters: {
 				'default': 'mongo',
 				disk: require('sails-disk'),
+				memory: require('sails-memory'),
 				mongo: require('sails-mongo')
 			},
 

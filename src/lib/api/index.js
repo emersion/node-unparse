@@ -52,10 +52,10 @@ api.rejected = function (err, res) {
 			code = err.code;
 			msg = err.message;
 		} else if (err instanceof Error) {
-			msg = err.name + ': ' +err.message;
+			msg = (err.name || err.code) + ': ' +(err.message || err.reason);
 
 			console.warn(err);
-			console.warn(err.stack);
+			if (err.stack) console.warn(err.stack);
 		}
 	} else {
 		msg = 'unknown error';
@@ -64,7 +64,7 @@ api.rejected = function (err, res) {
 		console.trace();
 	}
 //console.warn(err);
-	res.status(code).send({ error: String(msg) });
+	res.status(code).send({ code: code, error: String(msg) });
 };
 api.notImplemented = function (res) {
 	return api.rejected(ApiError.notImplemented(), res);
@@ -261,7 +261,7 @@ db.connect().then(function () {
 	process.exit(1);
 });
 // Wait for the database before answering requests
-app.use(function(req, res, next) {
+app.use(function (req, res, next) {
 	if (db.connecting.isPending()) { // Database not ready
 		db.connecting.then(function () {
 			next();
@@ -282,7 +282,18 @@ app.use(function (req, res, next) {
 	if (req.body && typeof req.body === 'object') {
 		if (req.body._SessionToken) {
 			userAuth.sessionToken = req.body._SessionToken;
+			delete req.body._SessionToken;
 		}
+	}
+
+	// Delete other request fields
+	if (req.body._ClientVersion) {
+		req.clientVersion = req.body._ClientVersion;
+		delete req.body._ClientVersion;
+	}
+	if (req.body._InstallationId) {
+		req.installationId = req.body._InstallationId;
+		delete req.body._InstallationId;
 	}
 
 	if (userAuth.sessionToken) {
@@ -309,7 +320,7 @@ app.use(function (req, res, next) {
 
 // Objects
 // @see https://www.parse.com/docs/rest#objects
-app.get('/1/classes/:className', function(req, res) { // Query objects
+app.get('/1/classes/:className', function (req, res) { // Query objects
 	// Try to parse JSON in the "where" parameter
 	if (typeof req.query == 'object' && typeof req.query.where == 'string') {
 		try {
@@ -338,7 +349,7 @@ app.post('/1/classes/:className', function(req, res, next) { // Create object
 		objectData: req.body
 	};
 
-	console.log('Inserting a new '+className);
+	console.log('Inserting a new '+params.className);
 	api.insertObject(params, req.user).then(function (result) {
 		res
 		//.location('/1/classes/'+className+'/'+result.objectId)
