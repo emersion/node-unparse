@@ -12,7 +12,6 @@ module.exports.loadModel = function (orm, classData) {
 		throw new Error('invalid model: no name specified');
 	}
 	if (this.isModelLoaded(name)) {
-		console.warn('Cannot load model '+name+': already loaded');
 		throw new Error('invalid model '+name+': already loaded');
 	}
 
@@ -110,7 +109,8 @@ module.exports.loadBaseModels = function (orm) {
 		attributes: {
 			name: {
 				type: 'string',
-				required: true
+				required: true,
+				unique: true
 			},
 			attributes: 'json'
 		}

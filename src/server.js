@@ -1,5 +1,6 @@
 var app = require('./app');
 
-module.exports = app.listen(app.get('port'), function() {
-  console.log("Server listening on port " + app.get('port'));
+var server = app.listen(process.env.PORT || 3000, function() {
+  console.log("Server listening on port " + server.address().port);
 });
+module.exports = server;

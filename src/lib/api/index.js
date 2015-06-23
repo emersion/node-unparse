@@ -246,7 +246,7 @@ api.deleteObject = function (params, user) {
 		// Delete the object
 		return db.deleteObject(params.className, params.objectId);
 	}).then(function () {
-		return; // Return nothing
+		return {}; // Return nothing
 	});
 };
 

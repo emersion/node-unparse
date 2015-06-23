@@ -83,7 +83,12 @@ function loadAllModels(classes) {
 	});
 }
 function loadModel(classData) {
-	return loadAllModels([classData]);
+	return Q.try(function () {
+		models.loadModel(orm, classData);
+	}).then(function () {
+		console.log('Reloading database connections after models update');
+		return reload();
+	});
 }
 function unloadModel(className) {
 	models.unloadModel(className);

@@ -10,7 +10,6 @@ var configCtrl = require('./config');
 var api = require('./lib/api');
 var app = module.exports = express();
 
-app.set('port', process.env.PORT || 3000);
 //app.use(express.logger('dev'));
 app.use(bodyParser.json());
 app.use(bodyParser.json({
