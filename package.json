@@ -1,11 +1,12 @@
 {
   "name": "unparse",
-  "version": "1.2.19-alpha.2",
+  "version": "1.2.19-alpha.3",
   "description": "An open-source clone of Parse.",
-  "main": "index.js",
+  "main": "src/app.js",
   "scripts": {
-    "test": "grunt test",
-    "start": "src/unparse"
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "start": "src/unparse",
+    "init": "src/unparse init"
   },
   "repository": {
     "type": "git",
