@@ -1,5 +1,7 @@
 #!/usr/bin/env node
 
+var unparse = require('./index');
+
 // Allows the server to be launched from another directory
 process.chdir(__dirname);
 
@@ -27,63 +29,15 @@ var opt = require('node-getopt').create([
 switch (opt.argv[0]) {
 	case 'init':
 		// Initialize unparse
-		var crypto = require('crypto');
-		var configCtrl = require('./config');
-		var db = require('./lib/db');
-
-		/**
-		 * Generate a key.
-		 * @return {String} The generated key.
-		 */
-		function generateKey() {
-			var sha = crypto.createHash('sha1');
-			sha.update(Math.random().toString());
-			return sha.digest('hex');
-		}
-
-		// Generate app ID and keys if empty
-		configCtrl.read().then(function (config) {
-			if (!config.appId) {
-				config.appId = generateKey();
-				process.stdout.write('App ID generated: '+config.appId+'\n');
-			}
-
-			var keysNames = ['javascriptKey', 'restKey'];
-			for (var i = 0; i < keysNames.length; i++) {
-				var keyName = keysNames[i],
-					keyValue = config[keyName];
-
-				if (!keyValue) {
-					keyValue = generateKey();
-					config[keyName] = keyValue;
-
-					process.stdout.write(keyName+' generated: '+keyValue+'\n');
-				}
-			}
-
-			return configCtrl.write(config);
-		}).then(function () {
-			// Populate the database with default classes
-			process.stdout.write('Connecting to the database...\n');
-			return db.connect().then(function () {
-				process.stdout.write('Populating database with default classes...\n');
-				return db.init();
-			}).then(function () {
-				process.stdout.write('Database populated with default classes.\n');
-				process.exit(0);
-			}, function (err) {
-				process.stderr.write('Failed to populate the database.\n');
-				console.error(err);
-				if (err.stack) {
-					console.error(err.stack);
-				}
-				process.exit(1);
-			});
+		unparse.init().then(function () {
+			process.exit(0);
+		}, function (err) {
+			console.error(err.stack || err);
+			process.exit(1);
 		});
-
 		return;
 	case 'server':
 	default:
 		// Start the server
-		require('./server');
+		unparse.server();
 }

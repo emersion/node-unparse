@@ -38,12 +38,12 @@ Running the server
 
 Start the server:
 ```
-./unparse
+npm run start
 ```
 
 Initialize the database with default classes:
 ```
-./unparse init
+npm run init
 ```
 
 Using Parse Javascript SDK

@@ -1,6 +1,6 @@
 var fs = require('fs');
 var express = require('express');
-var app = module.exports = express();
+var app = express();
 var extend = require('extend');
 var crypto = require('crypto');
 var Q = require('q');
@@ -250,16 +250,6 @@ api.deleteObject = function (params, user) {
 	});
 };
 
-// Connect to the database
-db.connect().then(function () {
-	console.log('Database connected.');
-}, function (err) {
-	console.error('Cannot connect to database: ', err);
-	if (err.stack) {
-		console.error(err.stack);
-	}
-	process.exit(1);
-});
 // Wait for the database before answering requests
 app.use(function (req, res, next) {
 	if (db.connecting.isPending()) { // Database not ready
@@ -593,3 +583,11 @@ app.post('/1/functions/:functionName', function(req, res) { // Call a cloud func
 app.post('/1/jobs/:jobName', function(req, res) { // Start a background job
 	api.notImplemented(res);
 });
+
+module.exports = function (config) {
+	// Connect to the database
+	return db.connect(config).then(function () {
+		console.log('Database connected.');
+		return app;
+	});
+};

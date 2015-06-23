@@ -4,11 +4,11 @@ var EventEmitter = require('events').EventEmitter;
 var extend = require('extend');
 
 var models = require('./models');
-var configCtrl = require('../../config');
 
 var controller = new EventEmitter();
 
 var orm;
+var ormConfig;
 var connections, collections;
 
 function isClass(className) {
@@ -21,43 +21,39 @@ function ensureClassExists(className) {
 	return Q();
 }
 
-function getConfig() {
-	return configCtrl.read().then(function (config) {
-		return {
-			// Setup Adapters
-			// Creates named adapters that have have been required
-			adapters: {
-				'default': 'mongo',
-				disk: require('sails-disk'),
-				memory: require('sails-memory'),
-				mongo: require('sails-mongo')
-			},
+function getOrmConfig(config) {
+	return {
+		// Setup Adapters
+		// Creates named adapters that have have been required
+		adapters: {
+			'default': 'mongo',
+			disk: require('sails-disk'),
+			memory: require('sails-memory'),
+			mongo: require('sails-mongo')
+		},
 
-			// Build Connections Config
-			// Setup connections using the named adapter configs
-			connections: {
-				'default': config.connection
-			}
-		};
-	});
+		// Build Connections Config
+		// Setup connections using the named adapter configs
+		connections: {
+			'default': config.connection
+		}
+	};
 }
 function initialize() {
-	return getConfig().then(function (config) {
-		// Start Waterline passing adapters in
-		var deferred = Q.defer();
-		orm.initialize(config, function(err, data) {
-			if (err) {
-				deferred.reject(err);
-				return;
-			}
+	// Start Waterline passing adapters in
+	var deferred = Q.defer();
+	orm.initialize(ormConfig, function(err, data) {
+		if (err) {
+			deferred.reject(err);
+			return;
+		}
 
-			connections = data.connections;
-			collections = data.collections;
+		connections = data.connections;
+		collections = data.collections;
 
-			deferred.resolve();
-		});
-		return deferred.promise;
+		deferred.resolve();
 	});
+	return deferred.promise;
 }
 function teardown() {
 	var deferred = Q.defer();
@@ -96,11 +92,13 @@ function unloadModel(className) {
 	delete orm.collections[className.toLowerCase()];
 }
 
-controller.connect = function () {
+controller.connect = function (config) {
 	var that = this;
 
 	orm = new Waterline();
 	models.loadBaseModels(orm);
+
+	ormConfig = getOrmConfig(config);
 
 	var promise = initialize().then(function () {
 		// Load stored models
