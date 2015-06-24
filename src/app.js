@@ -8,7 +8,7 @@ var session = require('cookie-session');
 
 var apiBuilder = require('./lib/api');
 
-module.exports = function (config) {
+var unparse = function (config) {
 	var app = express();
 
 	//app.use(express.logger('dev'));
@@ -121,3 +121,5 @@ module.exports = function (config) {
 
 	return app;
 };
+
+module.exports = unparse;
