@@ -2,9 +2,6 @@
 
 var configCtrl = require('./config');
 
-// Allows the server to be launched from another directory
-process.chdir(__dirname);
-
 // Get argv
 var argv = process.argv;
 if (argv[0] == 'node') {
@@ -15,7 +12,8 @@ if (argv[0] == 'node') {
 
 // Parse argv
 var opt = require('node-getopt').create([
-	['h' , 'help', 'display this help']
+	['h' , 'help', 'display this help'],
+	['c', 'config-file=ARG', 'set Unparse config file']
 ])
 .setHelp('Usage: node unparse [OPTIONS]\n'+
 	'An open-source clone of Parse.\n\n'+
@@ -25,6 +23,13 @@ var opt = require('node-getopt').create([
 	'Options:\n[[OPTIONS]]\n')
 .bindHelp()
 .parseSystem();
+
+if (opt.options['config-file']) {
+	configCtrl.setPath(opt.options['config-file']);
+}
+
+// Allows the server to be launched from another directory
+process.chdir(__dirname);
 
 switch (opt.argv[0]) {
 	case 'init':

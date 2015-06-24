@@ -2,19 +2,27 @@ var fs = require('fs');
 var extend = require('extend');
 var Q = require('q');
 
-var env = process.env.NODE_ENV || 'development';
-
-var configFile = __dirname+'/'+env+'.json',
-	json = fs.readFileSync(configFile),
+var configFile = null,
 	config = null;
 
-try {
+function load(filepath) {
+	var json = fs.readFileSync(filepath);
 	config = JSON.parse(json);
+	configFile = filepath;
+}
+
+var env = process.env.NODE_ENV || 'development';
+try {
+	load(__dirname+'/'+env+'.json');
 } catch (e) {
-	console.warn('Cannot parse config', e);
+	console.warn('Cannot load config', e);
 }
 
 var controller = {};
+
+controller.setPath = function (filepath) {
+	return load(filepath);
+};
 
 controller.read = function () {
 	return Q(config);
