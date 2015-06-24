@@ -8,7 +8,7 @@ var session = require('cookie-session');
 
 var apiBuilder = require('./lib/api');
 
-module.exports = function (configCtrl) {
+module.exports = function (config) {
 	var app = express();
 
 	//app.use(express.logger('dev'));
@@ -84,29 +84,23 @@ module.exports = function (configCtrl) {
 		}
 
 		// Check API credentials
-		configCtrl.read().then(function (config) {
-			var authenticated = false;
-			if (config.appId == appAuth.appId) {
-				if (config.javascriptKey == appAuth.javascriptKey) {
-					authenticated = true;
-				} else if (config.restKey == appAuth.restKey) {
-					authenticated = true;
-				}
+		var authenticated = false;
+		if (config.appId == appAuth.appId) {
+			if (config.javascriptKey == appAuth.javascriptKey) {
+				authenticated = true;
+			} else if (config.restKey == appAuth.restKey) {
+				authenticated = true;
 			}
+		}
 
-			if (authenticated) { // No problem
-				next();
-			} else { // Access denied
-				res.status(401).send({ error: 'unauthorized' });
-			}
-		}, function () {
-			res.status(500).send({ error: 'unable to read config file' });
-		});
+		if (authenticated) { // No problem
+			next();
+		} else { // Access denied
+			res.status(401).send({ error: 'unauthorized' });
+		}
 	});
 
-	configCtrl.read().then(function (config) {
-		return apiBuilder(config);
-	}).then(function (api) {
+	apiBuilder(config).then(function (api) {
 		app.use(api);
 	}, function (err) {
 		console.error('Cannot connect to database:', err);
@@ -118,9 +112,9 @@ module.exports = function (configCtrl) {
 
 	// Error handling
 	if ('development' === app.get('env')) {
-	  app.use(errorhandler());
+		app.use(errorhandler());
 	}
-	app.use(function(err, req, res, next){
+	app.use(function (err, req, res, next) {
 		console.error(err.stack);
 		res.status(500).send('Something broke!');
 	});
