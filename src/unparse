@@ -1,12 +1,7 @@
 #!/usr/bin/env node
 
 var path = require('path');
-var cwd = process.cwd();
-
-// Allows the server to be launched from another directory
-process.chdir(__dirname);
-
-var configCtrl = require('./config/index.js');
+var configCtrl = require(__dirname+'/config/index.js');
 
 // Get argv
 var argv = process.argv;
@@ -31,7 +26,7 @@ var opt = require('node-getopt').create([
 .parseSystem();
 
 if (opt.options['config-file']) {
-	var filepath = path.resolve(cwd, opt.options['config-file']);
+	var filepath = path.resolve(process.cwd(), opt.options['config-file']);
 	configCtrl.setPath(filepath);
 }
 
@@ -39,7 +34,7 @@ switch (opt.argv[0]) {
 	case 'init':
 		// Initialize unparse
 		var crypto = require('crypto');
-		var db = require('./lib/db');
+		var db = require(__dirname+'/lib/db');
 
 		/**
 		 * Generate a key.
@@ -97,7 +92,7 @@ switch (opt.argv[0]) {
 	case 'server':
 	default:
 		// Start the server
-		var appBuilder = require('./app');
+		var appBuilder = require(__dirname+'/app');
 		var app = appBuilder(configCtrl.readSync());
 
 		var server = app.listen(process.env.PORT || 3000, function() {
