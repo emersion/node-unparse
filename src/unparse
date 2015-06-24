@@ -1,6 +1,12 @@
 #!/usr/bin/env node
 
-var configCtrl = require('./config');
+var path = require('path');
+var cwd = process.cwd();
+
+// Allows the server to be launched from another directory
+process.chdir(__dirname);
+
+var configCtrl = require('./config/index.js');
 
 // Get argv
 var argv = process.argv;
@@ -25,11 +31,9 @@ var opt = require('node-getopt').create([
 .parseSystem();
 
 if (opt.options['config-file']) {
-	configCtrl.setPath(opt.options['config-file']);
+	var filepath = path.resolve(cwd, opt.options['config-file']);
+	configCtrl.setPath(filepath);
 }
-
-// Allows the server to be launched from another directory
-process.chdir(__dirname);
 
 switch (opt.argv[0]) {
 	case 'init':
