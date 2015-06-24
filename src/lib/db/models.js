@@ -18,7 +18,7 @@ module.exports.loadModel = function (orm, classData) {
 	console.log('Loading model '+name);
 
 	var def = {
-		identity: String(name),
+		identity: String(name).toLowerCase(), // See https://github.com/balderdashy/waterline/issues/745
 		connection: 'default',
 		autoCreatedAt: true,
 		autoUpdatedAt: true,
