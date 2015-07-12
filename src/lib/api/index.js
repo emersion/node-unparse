@@ -111,10 +111,11 @@ api.acl.classDefaults = function (classObj) {
 	};
 };
 api.acl.get = function (object) {
-	if (object.ACL) {
+	if (object && object.ACL) {
 		return object.ACL;
 	} else {
-		if (object.constructor.modelName == '__Class') {
+		// TODO: find another way to detect if object is a class
+		if (object && object.name && object.attributes) {
 			return this.classDefaults(object);
 		} else {
 			return this.defaults(object);
@@ -145,28 +146,40 @@ api.acl.verify = function (object, user, operation) {
 	return false;
 };
 api.acl.try = function (object, user, operation, previous) { // read, write
-	var promise = Q(previous || object);
-
-	promise.then(function (result) {
+	return Q(previous || object).then(function (result) {
 		if (!api.acl.verify(object, user, operation)) {
 			throw ApiError.unauthorized();
 		}
 
 		return result;
 	});
-
-	return promise;
 };
-api.acl.tryForClass = function (className, user, operation, previous) { // get, find, update. insert, delete
+api.acl.tryForClass = function (className, user, operation, previous) { // get, find, update. create, delete
+	if (className == '__Class') {
+		return Q(previous).then(function (result) {
+			var object = {
+				ACL: api.acl.classDefaults() // TODO: __Class is not like other classes
+			};
+
+			if (!api.acl.verify(object, user, operation)) {
+				throw ApiError.unauthorized();
+			}
+
+			return result;
+		});
+	}
+
 	return db.queryOne('__Class', { where: { name: className } }).then(function (classObj) {
 		return api.acl.try(classObj, user, operation, previous);
+	}).then(function (res) {
+		return res;
 	});
 };
 
 // API functions, with ACL checks
 api.queryObjects = function (params, user) {
 	// Check class ACL
-	return api.acl.tryForClass(params.className, user, 'query').then(function () {
+	return api.acl.tryForClass(params.className, user, 'find').then(function () {
 		// Execute the query
 		return db.queryObjects(params.className, params.options);
 	}).then(function (data) {
@@ -206,7 +219,7 @@ api.retrieveObject = function (params, user) {
 };
 api.insertObject = function (params, user) {
 	// Check class ACL
-	return api.acl.tryForClass(params.className, user, 'insert').then(function () {
+	return api.acl.tryForClass(params.className, user, 'create').then(function () {
 		// Insert the new object
 		return db.insertObject(params.className, params.objectData);
 	}).then(function (object) {
