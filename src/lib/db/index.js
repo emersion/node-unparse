@@ -158,62 +158,78 @@ controller.queryObjects = function (className, opts) {
 			var query = model.find();
 
 			if (where) {
-				var constraints = {
-					$lt: 'lt',
-					$lte: 'lte',
-					$gt: 'gt',
-					$gte: 'gte',
-					$ne: 'ne',
-					$in: 'in',
-					$nin: 'nin',
-					$exists: 'exists',
-					$select: function (value) {
-						//return this.lte(value);
-						//TODO
+				var operators = {
+					$lt: '<',
+					$lte: '<=',
+					$gt: '>',
+					$gte: '>=',
+					$ne: '!',
+					$in: function (items, key) {
+						var choices = [];
+						items.forEach(function (item) {
+							var constraint = {};
+							constraint[key] = item;
+							choices.push(constraint);
+						});
+						return { or: choices };
 					},
-					$dontSelect: function (value) {
-						//TODO
+					$nin: function (items, key) {
+						return { '!': operators.$in(items, key) };
 					},
-					$all: 'all'
+					$exists: function (val, key) {
+						var constraint = {};
+						constraint[key] = null;
+						if (val) {
+							constraint = { '!': constraint };
+						}
+						return constraint;
+					},
+					$select: null,
+					$dontSelect: null,
+					$all: 'contains',
+					$regex: null,
+
+					$inQuery: null,
+					$notInQuery: null,
+					$relatedTo: null
 				};
 
-				for (var path in where) {
-					var pathConstraints = where[path];
+				for (var key in where) {
+					var value = where[key];
 
-					if (path == '$or') {
-						query.or(pathConstraints); //TODO: parse each subquery
-					} else if (path == '$and') {
-						query.and(pathConstraints); //TODO: parse each subquery
-					} else if (pathConstraints instanceof Array) {
-						query.where(path, pathConstraints);
-					} else if (typeof pathConstraints == 'object') {
-						query.where(path);
-						for (var name in constraints) {
-							if (typeof pathConstraints[name] == 'undefined') {
+					if (key == '$or') {
+						where['or'] = value;
+						delete where[key];
+					}
+
+					if (typeof value == 'object') {
+						if (value.__type) {
+							console.warn('WARN: relational queries not supported');
+							continue;
+						}
+
+						for (var operatorName in value) {
+							var val = value[operatorName];
+
+							if (!operators[operatorName]) {
+								console.warn('WARN: operator "'+operatorName+'" not yet implemented');
 								continue;
 							}
 
-							var value = pathConstraints[name],
-								method = constraints[name];
+							var operator = operators[operatorName];
 
-							if (typeof method == 'function') {
-								constraints[name].call(query, value);
-							} else {
-								query[method].call(query, value);
+							if (typeof operator == 'string') {
+								var constraint = {};
+								constraint[operator] = val;
+								value[operatorName] = constraint;
+							} else if (typeof operator == 'function') {
+								value[operatorName] = operator(val, key);
 							}
 						}
-
-						if (typeof pathConstraints.__type != 'undefined') {
-							if (pathConstraints.__type == 'Pointer') {
-
-							} else if (pathConstraints.__type == 'Object') {
-
-							}
-						}
-					} else {
-						query.where(path, pathConstraints);
 					}
 				}
+
+				query.where(where);
 			}
 
 			if (populate) {
