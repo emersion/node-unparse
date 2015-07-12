@@ -125,7 +125,7 @@ controller.retrieveObject = function (className, objectId) {
 	return ensureClassExists(className).then(function () {
 		var deferred = Q.defer();
 
-		that.model(className).findById(objectId, function (err, object) {
+		that.model(className).findOne(objectId, function (err, object) {
 			if (err) {
 				deferred.reject('cannot retrieve object: '+err);
 			} else {
