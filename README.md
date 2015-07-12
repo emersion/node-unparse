@@ -17,7 +17,7 @@ Features
 - [ ] Querying objects (query contraints)
 - [ ] Querying objects (relationnal queries)
 - [x] API keys and authentication
-- [ ] Access Control Lists (ACL)
+- [x] Access Control Lists (ACL)
 - [ ] Users
   - [x] Signup
   - [x] Login
