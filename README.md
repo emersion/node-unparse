@@ -14,7 +14,7 @@ Features
 - [x] Updating objects
 - [x] Deleting objects
 - [x] Querying objects (basic support)
-- [ ] Querying objects (query contraints)
+- [x] Querying objects (query contraints)
 - [ ] Querying objects (relationnal queries)
 - [x] API keys and authentication
 - [x] Access Control Lists (ACL)
@@ -29,21 +29,21 @@ Features
   - [x] Deleting users
 - [ ] Pointers (one-to-one)
 - [ ] Relations (one-to-many)
-- [ ] Roles
+- [x] Roles
 - [ ] Files
 - [ ] Cloud functions, cloud code
 
 Running the server
 ------------------
 
+Initialize the database with default classes and objects:
+```
+npm run init
+```
+
 Start the server:
 ```
 npm run start
-```
-
-Initialize the database with default classes:
-```
-npm run init
 ```
 
 Using Parse Javascript SDK
