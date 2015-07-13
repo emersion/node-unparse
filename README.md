@@ -1,7 +1,7 @@
-Unparse 1.2.19 alpha 1
-======================
+Unparse
+=======
 
-An open-source clone of Parse, using MongoDB as database and implemented with Node.js.
+An open-source clone of Parse, using [Waterline](https://github.com/balderdashy/waterline) as database backend and implemented with Node.js.
 
 See https://www.parse.com/docs/rest for the REST API documentation. Unparse should be compatible with it and existing Parse SDKs (e.g. with the [Javascript SDK](https://parse.com/docs/js_guide)). For a list of existing Parse SDKs (official and unofficial), see this page : https://www.parse.com/docs/api_libraries
 
@@ -32,6 +32,11 @@ Features
 - [x] Roles
 - [ ] Files
 - [ ] Cloud functions, cloud code
+
+Dashboard
+---------
+
+A dashboard for Unparse is available here: https://github.com/unparse/unparse-dashboard
 
 Running the server
 ------------------
