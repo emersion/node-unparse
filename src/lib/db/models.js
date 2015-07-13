@@ -29,10 +29,7 @@ module.exports.loadModel = function (orm, classData) {
 			}*/
 		},
 		attributes: {
-			ACL: 'json',
-			toJSON: function () {
-				
-			}
+			ACL: 'json'
 		}
 	};
 
@@ -82,6 +79,10 @@ module.exports.loadModel = function (orm, classData) {
 		}
 
 		return data;
+	};
+
+	def.attributes.getClassName = function () {
+		return name;
 	};
 
 	var collection = Waterline.Collection.extend(def);

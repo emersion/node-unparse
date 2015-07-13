@@ -302,15 +302,25 @@ controller.insertObject = function (className, objectData) {
 	var that = this;
 
 	return ensureClassExists(className).then(function () {
-		return that.model(className).create(objectData).then(function (object) {
-			// If we're inserting a new class
-			if (className == '__Class') {
-				return loadModel(object).catch(function (err) {
-					return object.destroy().thenReject(err);
-				}).thenResolve(object);
+		return that.model(className).create(objectData);
+	}).then(function (object) {
+		// If we're inserting a new class
+		if (className == '__Class') {
+			// objectData can be an Array, as used in controller.init()
+			var objects = object;
+			if (!(objects instanceof Array)) {
+				objects = [objects];
 			}
-			return object;
-		});
+
+			return loadAllModels(objects).catch(function (err) {
+				return that.model(className).destroy(object).catch(function (suberr) {
+					console.warn('WARN: could not destroy bad class '+objectData.name, suberr);
+				}).finally(function () {
+					throw err;
+				});
+			}).thenResolve(object);
+		}
+		return object;
 	});
 };
 
@@ -354,7 +364,7 @@ controller.deleteObject = function (className, objectId) {
 };
 
 controller.init = function () {
-	var deferred = Q.defer();
+	var that = this;
 
 	// Default classes
 	var classes = [{
@@ -380,16 +390,20 @@ controller.init = function () {
 			authData:  {
 				type: 'json',
 				'protected': true
-			}/*,
+			},
 			roles: {
 				collection: '_Role',
 				via: 'users'
-			}*/
+			}
 		}
-	}/*, {
+	}, {
 		name: '_Role',
 		attributes: {
-			name: 'string',
+			name: {
+				type: 'string',
+				required: true,
+				unique: true
+			},
 			roles: {
 				collection: '_Role'
 			},
@@ -399,23 +413,14 @@ controller.init = function () {
 				dominant: true
 			}
 		}
-	}*/];
+	}];
 
-	var promises = [];
-	for (var i = 0; i < classes.length; i++) {
-		var classData = classes[i];
-
-		// The class will be automatically loaded when inserting it
-		var promise = this.insertObject('__Class', classData).catch(function (err) {
-			if (models.isModelLoaded(classData.name)) {
-				models.unloadModel(classData.name);
-			}
-			throw err;
-		});
-		promises.push(promise);
-	}
-
-	return Q.all(promises);
+	return that.insertObject('__Class', classes)/*.catch(function (err) {
+		if (models.isModelLoaded(classData.name)) {
+			models.unloadModel(classData.name);
+		}
+		throw err;
+	})*/;
 };
 
 module.exports = controller;

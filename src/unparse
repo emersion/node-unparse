@@ -2,6 +2,7 @@
 
 var path = require('path');
 var configCtrl = require(__dirname+'/config/index.js');
+var hasher = require(__dirname+'/lib/hasher.js');
 
 // Get argv
 var argv = process.argv;
@@ -46,6 +47,39 @@ switch (opt.argv[0]) {
 			return sha.digest('hex');
 		}
 
+		function populateObjects() {
+			// Default role: root
+			var roleData = {
+				name: 'root',
+				ACL: {
+					'role:root': { read: true, write: true },
+					'*': { read: false, write: false }
+				}
+			};
+			return db.insertObject('_Role', roleData).then(function (role) {
+				// Default user: root
+				var userData = {
+					username: 'root',
+					password: 'root',
+					roles: [role],
+					ACL: {
+						'*': { read: false, write: false }
+					}
+				};
+				return hasher.hash(userData.password).then(function (hash) {
+					userData.password = hash;
+					return userData;
+				}).then(function (userData) {
+					return db.insertObject('_User', userData);
+				}).then(function (user) {
+					user.ACL[user.id] = { read: true, write: true };
+					return user.save();
+				});
+			}).then(function (user) {
+				console.log('Default user added with username "root" and password "root".');
+			});
+		}
+
 		// Generate app ID and keys if empty
 		var config = null;
 		return configCtrl.read().then(function (cfg) {
@@ -79,7 +113,16 @@ switch (opt.argv[0]) {
 			}).then(function () {
 				console.log('Database populated with default classes.');
 			}, function (err) {
-				console.error('Failed to populate the database.');
+				console.error('Failed to populate database classes.');
+				throw err;
+			});
+		}).then(function () {
+			// Populate the database with default roles & users
+			console.log('Populating database with default roles & users...');
+			return populateObjects().then(function () {
+				console.log('Database populated with default roles & users.');
+			}, function (err) {
+				console.error('Failed to populate database roles & users.');
 				throw err;
 			});
 		}).then(function () {

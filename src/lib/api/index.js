@@ -13,12 +13,14 @@ var hasher = require('../hasher');
  * An API error.
  * @param {String} msg  The error message.
  * @param {Number} code The HTTP error code.
+ * @param {Number} parseCode The Parse error code.
  * @see https://en.wikipedia.org/wiki/List_of_HTTP_status_codes
  */
-function ApiError(msg, code) {
+function ApiError(msg, code, parseCode) {
 	this.name = 'ApiError';
 	this.message = msg;
 	this.code = code || 400;
+	this.parseCode = parseCode || this.code;
 }
 ApiError.unauthorized = function () {
 	return new ApiError('unauthorized', 401);
@@ -45,11 +47,13 @@ var api = {};
 // Working with promises and responses
 api.rejected = function (err, res) {
 	var code = 400,
+		parseCode = null,
 		msg = err;
 
 	if (err) {
 		if (err instanceof ApiError) {
 			code = err.code;
+			parseCode = err.parseCode;
 			msg = err.message;
 		} else if (err instanceof Error) {
 			msg = (err.name || err.code) + ': ' +(err.message || err.reason);
@@ -64,7 +68,7 @@ api.rejected = function (err, res) {
 		console.trace();
 	}
 //console.warn(err);
-	res.status(code).send({ code: code, error: String(msg) });
+	res.status(code).send({ code: parseCode || code, error: String(msg) });
 };
 api.notImplemented = function (res) {
 	return api.rejected(ApiError.notImplemented(), res);
@@ -114,8 +118,7 @@ api.acl.get = function (object) {
 	if (object && object.ACL) {
 		return object.ACL;
 	} else {
-		// TODO: find another way to detect if object is a class
-		if (object && object.name && object.attributes) {
+		if (object && object.getClassName && object.getClassName() == '__Class') {
 			return this.classDefaults(object);
 		} else {
 			return this.defaults(object);
@@ -129,9 +132,13 @@ api.acl.verify = function (object, user, operation) {
 		userGroups = [];
 
 	if (user) {
-		userGroups.push(user._id);
+		userGroups.push(String(user.id));
+		if (user.roles) {
+			user.roles.forEach(function (role) {
+				userGroups.push('role:'+role.name);
+			});
+		}
 	}
-	// TODO: roles support: "role:Members":{"write":true}
 	userGroups.push('*');
 
 	// The order of groups is important (more specific -> more general)
@@ -302,7 +309,7 @@ app.use(function (req, res, next) {
 	if (userAuth.sessionToken) {
 		db.model('_User').findOne({
 			sessionToken: userAuth.sessionToken
-		}, function (err, user) {
+		}).populate('roles').exec(function (err, user) {
 			if (err) {
 				api.rejected(new ApiError('cannot find session token: '+err, 500), res);
 				return;
@@ -310,7 +317,7 @@ app.use(function (req, res, next) {
 			if (user) {
 				req.user = user;
 			} else {
-				api.rejected(new ApiError('invalid session token', 401), res);
+				api.rejected(new ApiError('invalid session token', 401, 209), res);
 				return;
 			}
 			
@@ -386,13 +393,14 @@ app.get('/1/login', function(req, res) { // Logging in
 		password = req.param('password');
 
 	function invalidCredentials() {
-		// TODO: add a little delay to prevent bruteforce attacks
-		return new ApiError('invalid login parameters', 404);
+		// Add a little delay to prevent bruteforce attacks
+		var error = new ApiError('invalid login parameters', 404);
+		return Q.delay(500).thenReject(error);
 	}
 
 	db.model('_User').findOne({
 		username: username
-	}, function (err, user) {
+	}).populate('roles').exec(function (err, user) {
 		if (err || !user) {
 			return api.rejected(invalidCredentials(), res);
 		}
@@ -400,7 +408,7 @@ app.get('/1/login', function(req, res) { // Logging in
 		// Check password
 		var promise = hasher.compare(password, user.password).then(function (isCorrect) {
 			if (!isCorrect) {
-				throw invalidCredentials();
+				return invalidCredentials();
 			}
 
 			// TODO: check if password needs rehash
@@ -414,28 +422,20 @@ app.get('/1/login', function(req, res) { // Logging in
 				result.sessionToken = user.sessionToken;
 				return result;
 			} else { // No session token available
-				result.sessionToken = generateSessionToken();
-
-				return api.updateObject({
-					className: '_User',
-					objectId: result.objectId,
-					objectData: {
-						sessionToken: result.sessionToken
-					}
-				}, req.user).then(function () {
-					return result;
-				});
+				user.sessionToken = generateSessionToken();
+				result.sessionToken = user.sessionToken;
+				return Q(user.save()).thenResolve(result);
 			}
 		}, function (err) {
 			console.warn('Cannot verify password hash: ', err);
-			throw invalidCredentials();
+			return invalidCredentials();
 		});
 		api.when(promise, res);
 	});
 });
 app.get('/1/users/me', function(req, res) { // Validating Session Tokens, Retrieving Current User
 	if (!req.user) {
-		return api.rejected(new ApiError('invalid session', 403), res);
+		return api.rejected(new ApiError('invalid session token', 403, 209), res);
 	}
 
 	res.send(req.user.toJSON());
