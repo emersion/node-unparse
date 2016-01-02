@@ -35,7 +35,7 @@ var unparse = function (config) {
 		var appAuth = {
 			appId: req.get('X-Parse-Application-Id') || '',
 			javascriptKey: req.get('X-Parse-Javascript-API-Key') || '',
-			restKey: req.get('X-Parse-REST-API-Key') || ''
+			restKey: req.get('X-Parse-REST-API-Key') || req.get('X-Parse-Client-Key') || ''
 		};
 
 		// Authentication with basic HTTP authentication
