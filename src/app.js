@@ -35,7 +35,8 @@ var unparse = function (config) {
 		var appAuth = {
 			appId: req.get('X-Parse-Application-Id') || '',
 			javascriptKey: req.get('X-Parse-Javascript-API-Key') || '',
-			restKey: req.get('X-Parse-REST-API-Key') || req.get('X-Parse-Client-Key') || ''
+			restKey: req.get('X-Parse-REST-API-Key') || '',
+			clientKey: req.get('X-Parse-Client-Key') || ''
 		};
 
 		// Authentication with basic HTTP authentication
@@ -89,6 +90,8 @@ var unparse = function (config) {
 			if (config.javascriptKey == appAuth.javascriptKey) {
 				authenticated = true;
 			} else if (config.restKey == appAuth.restKey) {
+				authenticated = true;
+			} else if (config.clientKey == appAuth.clientKey) {
 				authenticated = true;
 			}
 		}
