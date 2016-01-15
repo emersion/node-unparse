@@ -3,8 +3,6 @@ var path = require('path');
 var bodyParser = require('body-parser');
 var methodOverride = require('method-override');
 var errorhandler = require('errorhandler');
-//var cookieParser = require('cookie-parser');
-var session = require('cookie-session');
 
 var apiBuilder = require('./lib/api');
 
@@ -16,8 +14,6 @@ var unparse = function (config) {
 	app.use(bodyParser.json({
 		type: 'text/plain' // Parse JS SDK is not setting request Content-Type to "application/json"
 	}));
-	//app.use(cookieParser());
-	//app.use(session(config.session));
 	//app.use(express.compress());
 	app.use(methodOverride(function (req, res) {
 		if (req.body && typeof req.body === 'object' && '_method' in req.body) {

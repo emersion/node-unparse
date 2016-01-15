@@ -90,7 +90,7 @@ switch (opt.argv[0]) {
 				console.log('App ID generated: '+config.appId);
 			}
 
-			var keysNames = ['javascriptKey', 'restKey'];
+			var keysNames = ['javascriptKey', 'restKey', 'clientKey'];
 			for (var i = 0; i < keysNames.length; i++) {
 				var keyName = keysNames[i],
 					keyValue = config[keyName];

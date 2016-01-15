@@ -1,17 +1,9 @@
 {
   "connection": {
-    "adapter": "mongo",
-    "url": "mongodb://localhost:27017/unparse"
+    "adapter": "disk"
   },
-  "appId": "",
-  "javascriptKey": "",
-  "restKey": "",
-  "clientKey": "",
-  "session": {
-    "name": "unparse",
-    "keys": [
-      "change",
-      "this"
-    ]
-  }
+  "appId": "4a4579274c56809519169dd2e882679b155a80e6",
+  "javascriptKey": "cfd3798249d1ac3272c56ff9ddd7e6008e2e47c1",
+  "restKey": "ca87ddef2d592867e1fd4c5f1dee0ef0ea1ad10f",
+  "clientKey": "13100e8a70857ab366d76535623555a4ca067441"
 }

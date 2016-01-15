@@ -27,11 +27,19 @@ Features
   - [x] Updating users
   - [ ] Requesting a password reset
   - [x] Deleting users
+- [ ] Sessions
 - [ ] Pointers (one-to-one)
 - [ ] Relations (one-to-many)
-- [x] Roles
+- [ ] Roles
 - [ ] Files
+- [ ] Analytics
+- [ ] Push notifications
+- [ ] Installations
 - [ ] Cloud functions, cloud code
+- [ ] Schemas
+- [ ] Apps
+- [ ] Function hooks
+- [ ] Trigger hooks
 
 Dashboard
 ---------
