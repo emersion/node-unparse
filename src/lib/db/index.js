@@ -369,7 +369,7 @@ controller.init = function () {
 	// Default classes
 	var classes = [{
 		name: '_User',
-		attributes: {
+		fields: {
 			username: {
 				type: 'string',
 				required: true,
@@ -398,7 +398,7 @@ controller.init = function () {
 		}
 	}, {
 		name: '_Role',
-		attributes: {
+		fields: {
 			name: {
 				type: 'string',
 				required: true,

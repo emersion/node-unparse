@@ -6,7 +6,7 @@ module.exports.collections = {};
 
 module.exports.loadModel = function (orm, classData) {
 	var name = classData.name,
-		attributes = classData.attributes;
+		fields = classData.fields;
 
 	if (!name) {
 		throw new Error('invalid model: no name specified');
@@ -33,41 +33,41 @@ module.exports.loadModel = function (orm, classData) {
 		}
 	};
 
-	var protectedAttrs = [];
-	for (var attrName in attributes) {
-		var attr = attributes[attrName];
+	var protectedFields = [];
+	for (var fieldName in fields) {
+		var field = fields[fieldName];
 
-		if (def.attributes[attrName]) { // Do not override default fields
+		if (def.attributes[fieldName]) { // Do not override default fields
 			continue;
 		}
 
-		if (typeof attr == 'string') {
-			attr = {
-				type: attr
+		if (typeof field == 'string') {
+			field = {
+				type: field
 			};
 		}
 
-		if (attr.protected) {
-			protectedAttrs.push(attrName);
+		if (field.protected) {
+			protectedFields.push(fieldName);
 		}
 
-		def.attributes[attrName] = attr;
+		def.attributes[fieldName] = field;
 	}
 
 	def.attributes.toJSON = function () {
 		var data;
-		if (typeof attributes.toJSON == 'function') {
-			data = attributes.toJSON.apply(this, arguments);
+		if (typeof fields.toJSON == 'function') {
+			data = fields.toJSON.apply(this, arguments);
 		} else {
 			data = this.toObject();
 
-			// If any of the attributes are protected, we should remove them
-			if (protectedAttrs.length) {
-				for (var i = 0; i < protectedAttrs.length; i++) {
-					var attrName = protectedAttrs[i];
+			// If any of the fields is protected, we should remove it
+			if (protectedFields.length) {
+				for (var i = 0; i < protectedFields.length; i++) {
+					var fieldName = protectedFields[i];
 
-					if (typeof data[attrName] !== 'undefined') {
-						delete data[attrName];
+					if (typeof data[fieldName] !== 'undefined') {
+						delete data[fieldName];
 					}
 				}
 			}
@@ -107,13 +107,13 @@ module.exports.isModelLoaded = function (name) {
 module.exports.loadBaseModels = function (orm) {
 	this.loadModel(orm, {
 		name: '__Class',
-		attributes: {
+		fields: {
 			name: {
 				type: 'string',
 				required: true,
 				unique: true
 			},
-			attributes: 'json'
+			fields: 'json'
 		}
 	});
 };
